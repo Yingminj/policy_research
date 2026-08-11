@@ -1,0 +1,72 @@
+--- a/src/lerobot/policies/act/configuration_act.py
++++ b/src/lerobot/policies/act/configuration_act.py
+@@ -58,6 +58,9 @@
+             `None` means no pretrained weights.
+         replace_final_stride_with_dilation: Whether to replace the ResNet's final 2x2 stride with a dilated
+             convolution.
++        use_camera_embedding: Whether to add a learned per-camera embedding to the image tokens'
++            positional embedding. Without it, every camera's tokens carry an identical positional signal
++            and the encoder cannot tell the views apart. Only meaningful with more than one camera.
+         pre_norm: Whether to use "pre-norm" in the transformer blocks.
+         dim_model: The transformer blocks' main hidden dimension.
+         n_heads: The number of heads to use in the transformer blocks' multi-head attention.
+@@ -98,6 +101,14 @@
+     vision_backbone: str = "resnet18"
+     pretrained_backbone_weights: str | None = "ResNet18_Weights.IMAGENET1K_V1"
+     replace_final_stride_with_dilation: int = False
++    # Add a learned per-camera embedding to the image tokens' positional embedding, so the transformer
++    # encoder can tell which view each token came from. `ACTSinusoidalPositionEmbedding2d` derives its
++    # output solely from the feature map's shape and rescales each axis to [0, 2pi], so cameras whose
++    # feature maps have the same shape - i.e. all of them, since ACT requires equal image shapes - get
++    # byte-identical positional embeddings. Combined with the shared backbone, nothing in the default
++    # model distinguishes a token from the top camera from one at the same pixel of a wrist camera.
++    # Defaults to False so that checkpoints trained before this flag existed keep loading unchanged.
++    use_camera_embedding: bool = False
+     # Transformer layers.
+     pre_norm: bool = False
+     dim_model: int = 512
+--- a/src/lerobot/policies/act/modeling_act.py
++++ b/src/lerobot/policies/act/modeling_act.py
+@@ -363,6 +363,11 @@
+         self.encoder_1d_feature_pos_embed = nn.Embedding(n_1d_tokens, config.dim_model)
+         if self.config.image_features:
+             self.encoder_cam_feat_pos_embed = ACTSinusoidalPositionEmbedding2d(config.dim_model // 2)
++            # The sinusoidal embedding above is a pure function of the feature map's shape, so it is the
++            # same for every camera. This adds a learned per-view offset on top of it, in the same spirit
++            # as `encoder_1d_feature_pos_embed` distinguishing the latent/state/env-state tokens.
++            if config.use_camera_embedding:
++                self.encoder_cam_id_embed = nn.Embedding(len(config.image_features), config.dim_model)
+ 
+         # Transformer decoder.
+         # Learnable positional embedding for the transformer's decoder (in the style of DETR object queries).
+@@ -378,6 +383,11 @@
+         for p in chain(self.encoder.parameters(), self.decoder.parameters()):
+             if p.dim() > 1:
+                 nn.init.xavier_uniform_(p)
++        # The 2D sinusoidal embedding has unit-magnitude entries, so nn.Embedding's default N(0, 1) would
++        # start out dominating the spatial signal it is meant to complement. Start small and let training
++        # grow it only as far as disambiguating the views actually requires.
++        if self.config.image_features and self.config.use_camera_embedding:
++            nn.init.normal_(self.encoder_cam_id_embed.weight, std=0.02)
+ 
+     def forward(self, batch: dict[str, Tensor]) -> tuple[Tensor, tuple[Tensor, Tensor] | tuple[None, None]]:
+         """A forward pass through the Action Chunking Transformer (with optional VAE encoder).
+@@ -473,9 +483,17 @@
+             # For a list of images, the H and W may vary but H*W is constant.
+             # NOTE: If modifying this section, verify on MPS devices that
+             # gradients remain stable (no explosions or NaNs).
+-            for img in batch[OBS_IMAGES]:
++            for cam_index, img in enumerate(batch[OBS_IMAGES]):
+                 cam_features = self.backbone(img)["feature_map"]
+                 cam_pos_embed = self.encoder_cam_feat_pos_embed(cam_features).to(dtype=cam_features.dtype)
++                if self.config.use_camera_embedding:
++                    # (1, C) -> (1, C, 1, 1), broadcast so every token from this view is offset alike.
++                    # `batch[OBS_IMAGES]` is built by iterating `config.image_features`, whose order is
++                    # fixed by the saved config, so cam_index is stable across save/load.
++                    cam_id = torch.tensor([cam_index], device=cam_features.device)
++                    cam_pos_embed = cam_pos_embed + self.encoder_cam_id_embed(cam_id).to(
++                        dtype=cam_pos_embed.dtype
++                    )[:, :, None, None]
+                 cam_features = self.encoder_img_feat_input_proj(cam_features)
+ 
+                 # Rearrange features to (sequence, batch, dim).
