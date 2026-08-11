@@ -265,6 +265,60 @@ cam0 block == cam1 block: True
 是三份**完全一样**。这也是 5.1 节说"先补 camera embedding 再谈加深 encoder"的
 直接依据。
 
+### 2.3 decoder 单层内部接线图
+
+阶段 5 的方块内部展开。`_get_clones` 用 `copy.deepcopy` 复制 7 份
+（`transformer.py:289-290`），**结构一致但权重独立**，所以是 7×5,384,832 参数而不是
+共享一份。
+
+```
+                 一个 TransformerDecoderLayer 的内部（forward_post, :229-250）
+
+   tgt ────────────────────────────────────────────────┐（残差）
+    │                                                  │
+    ├──(+)── query_pos ──► q ──┐                       │
+    ├──(+)── query_pos ──► k ──┤                       │
+    │                          ├─► self_attn ──► tgt2 ─┴─(+)─► norm1 ─► tgt
+    └──────────────────► v ────┘                                          │
+        ⚠ v 不加 query_pos                                                 │
+        ⚠ 第0层这里 v=0 → 输出恒为常量（见 5.2）                             │
+                                                                          │
+   ┌──────────────────────────────────────────────────────────────────────┘
+   │
+   ├──(+)── query_pos ─────────────────► q ──┐        （残差）
+   │                                         │            │
+   memory ──(+)── pos_embed ───────────► k ──┼─► multihead_attn ─► tgt2 ─(+)─► norm2 ─► tgt
+   memory ─────────────────────────────► v ──┘                                          │
+              ▲                                                                         │
+              └─ pos_embed [902,B,512] 唯一进入 decoder 的地方，每层都加一次              │
+                 ⚠ v 用的是裸 memory，不加 pos_embed                                     │
+                                                                                        │
+   ┌────────────────────────────────────────────────────────────────────────────────────┘
+   │
+   └─► FFN: linear1(512→3200) → ReLU → dropout → linear2(3200→512) ─(+)─► norm3 ─► 输出
+```
+
+每层有 5 个注入点，`pos_embed` 只占其中一个（cross-attn 的 k）。encoder 层同理：
+`pos_embed` 加到 self-attn 的 q 和 k，不加到 v。
+
+**位置信息只影响"往哪看"，不影响"看到什么"。** value 永远是裸 `memory`，位置项只
+参与 `q·kᵀ` 决定注意力权重分布，取回的内容不含任何位置编码。这是 DETR 的惯例。
+
+两个容易误解的实现细节：
+
+- **`nn.Embedding` 在这里从未被查表。** `detr_vae.py:134` 传的是
+  `self.query_embed.weight` 整张 `[100,512]` 表，没有 index 输入；
+  `Transformer.forward` 只做 `unsqueeze(1).repeat(1,bs,1)` 沿 batch 广播。
+  用 `nn.Parameter` 写完全等价。
+- **`query_pos` 不是入口注入一次**，而是通过 `with_pos_embed` 在每层的 self-attn
+  (q,k) 和 cross-attn (q) 里重复相加。
+
+与 2.2 节末尾的相机身份问题联动：`pos_embed` 的 902 项中，前 2 项是
+`additional_pos_embed`（z 与 qpos 的可学位置编码），后 900 项是三路相机的正弦编码，
+而那三份逐字节相同。因此在 cross-attention 的 key 侧，"top 相机第 (r,c) 格"与
+"wrist_L 第 (r,c) 格"拿到的位置贡献也完全一样——query 想区分视角只能靠 memory 的
+内容差异。
+
 ---
 
 ## 3. 核心发现：decoder 层数的 `[0]` / `[-1]` 差异
@@ -281,6 +335,10 @@ cam0 block == cam1 block: True
 
 在 `[0]` 下，第 1…L−1 层仍会在 forward 里逐层执行，但它们的输出不参与 loss，
 因而**收不到任何梯度**。
+
+（细节：stack 里每一层的输出都过了 `self.norm`（`:130`），最后一层那份在循环结束后
+被重新 norm 的版本替换（`:135-136`）。所以无论取 `[0]` 还是 `[-1]`，拿到的都是
+LayerNorm 之后的结果，两者的差别纯粹在层数上。）
 
 ### 3.2 实测验证
 
