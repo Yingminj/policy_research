@@ -1,427 +1,255 @@
-# From Image Quality to Action Quality: Literature Review and Experimental Design
+# 从图像质量到动作质量：文献综述与实验设计
 
-**Scope.** What is known about how lossy image/video compression affects learned
-robot manipulation policies, how that relates to the pixel- and feature-level
-results already produced in `robot_data_platform/test_raw_jpeg`, and what
-experiment would actually close the remaining question.
+**范围。** 关于有损图像/视频压缩如何影响学习型机器人操作策略，目前已有哪些认识；这些认识与 `robot_data_platform/test_raw_jpeg` 已产出的像素级和特征级结果有何关联；以及什么样的实验才能真正回答剩余的问题。
 
-Compiled 2026-08-06. Sources verified by direct fetch except where marked
-*(unverified)*.
+编撰于 2026-08-06。除标注 *（未验证）* 的内容外，所有来源均经直接抓取核实。
 
 ---
 
-## 1. What we already have
+## 1. 我们已经掌握的内容
 
-`test_raw_jpeg/REPORT.md` measures a two-stage compression cascade on one
-36.8 s / 1103-frame recording of the `express` task, using the single
-uncompressed `/quad_tile` bag as a pixel-level ground truth. Three sources
-(raw, JPEG q100, JPEG q80) × three storage levels (h264 CRF 0/20/30), with
-byte-identical joint state and action arrays across all nine legs — only the
-image bytes differ.
+`test_raw_jpeg/REPORT.md` 在一段 36.8 秒 / 1103 帧的 `express` 任务录制上测量了一个两阶段压缩级联，以单个未压缩的 `/quad_tile` bag 作为像素级真值。三种来源（raw、JPEG q100、JPEG q80）× 三种存储级别（h264 CRF 0/20/30），全部九条分支的关节状态与动作数组逐字节一致——只有图像字节不同。
 
-Established there:
+该报告已确认的结论：
 
-| finding | number |
+| 结论 | 数值 |
 |---|---|
-| q80 vs raw, mosaic | 42.296 dB PSNR, 0.9747 SSIM |
-| q80 loss concentrates on wrists | head 45.95 dB vs wrist_L 38.99 dB (6–7 dB gap, mosaic stores head 2× upscaled) |
-| q80's marginal cost at CRF 20 | −1.181 dB vs raw source |
-| q80's marginal cost at CRF 30 | −0.359 dB |
-| q80's marginal cost at CRF 0 | −4.785 dB (and *larger* files) |
-| DINO CLS cosine, jpeg80_crf20 | 0.938–0.976 across three backbones |
-| PSNR ↔ CLS cosine | Spearman ρ = 0.927, Pearson r = 0.753 |
-| GOP=2 I/P oscillation at CRF 20 | 1.3–1.4 dB, alternating every frame |
+| q80 对比 raw，拼接图 | 42.296 dB PSNR，0.9747 SSIM |
+| q80 的损失集中在腕部相机 | 头部 45.95 dB 对比 wrist_L 38.99 dB（6–7 dB 差距，拼接图中头部以 2× 放大存储） |
+| q80 在 CRF 20 下的边际代价 | 相对 raw 源 −1.181 dB |
+| q80 在 CRF 30 下的边际代价 | −0.359 dB |
+| q80 在 CRF 0 下的边际代价 | −4.785 dB（且文件*更大*） |
+| DINO CLS 余弦相似度，jpeg80_crf20 | 三个骨干网络上为 0.938–0.976 |
+| PSNR ↔ CLS 余弦相似度 | Spearman ρ = 0.927，Pearson r = 0.753 |
+| CRF 20 下 GOP=2 的 I/P 帧振荡 | 1.3–1.4 dB，逐帧交替 |
 
-The report's own stated limitation is the open question: *pixel fidelity and
-policy success rate are not the same thing.* Everything below is about closing
-that gap.
+报告自身声明的局限正是那个悬而未决的问题：*像素保真度与策略成功率不是一回事。* 以下所有内容都是为了弥合这一差距。
 
 ---
 
-## 2. Nothing in this cluster has tested it
+## 2. 现有任务集群中没有一项对此做过测试
 
-Audit of `/mnt/robot_platform/jobs/` (7 jobs) and the 6 datasets they consume:
+对 `/mnt/robot_platform/jobs/`（7 个任务）及其消耗的 6 个数据集的审计：
 
-| dataset | eps | codec | CRF | trained |
+| 数据集 | 回合数 | 编解码器 | CRF | 训练情况 |
 |---|---:|---|---:|---|
-| express | 51 | h264 | 0 | 100k steps, ACT |
-| pack_airpods_lerobot | 40 | h264 | 20 | 300k steps, running |
+| express | 51 | h264 | 0 | 100k 步，ACT |
+| pack_airpods_lerobot | 40 | h264 | 20 | 300k 步，运行中 |
 | tea_2_lerobot | 53 | h264 | 20 | — |
 | dex_stack_box_mcap_le | 100 | h264 | 30 | — |
 | jjj_le | 50 | h264 | 30 | — |
-| peg_optical_module_0721_120 | 120 | av1 | — | 1k steps |
+| peg_optical_module_0721_120 | 120 | av1 | — | 1k 步 |
 
-The CRF axis is spanned (0 / 20 / 30 / AV1) but each level sits on a different
-task, robot configuration and episode count, so compression is fully confounded
-in every existing run. Every job used `seed 1000`; the seed has never been
-varied, so the noise floor that any compression effect must clear is unmeasured.
+CRF 轴虽然被覆盖（0 / 20 / 30 / AV1），但每个级别对应不同的任务、机器人配置和回合数，因此在所有现有运行中，压缩因素是完全混淆的。每个任务都使用 `seed 1000`；随机种子从未被变动过，因此任何压缩效应所必须超越的噪声底线从未被测量过。
 
-`dataset/sc3_lerobot` (h264 CRF 0) and `dataset/sc3_lerobot_crf30` (av1 CRF 30)
-are the same 186 episodes / 167,709 frames at two quality levels — a genuine
-matched pair, but never trained on, and the two differ in codec *and* CRF
-simultaneously.
+`dataset/sc3_lerobot`（h264 CRF 0）和 `dataset/sc3_lerobot_crf30`（av1 CRF 30）是相同的 186 个回合 / 167,709 帧在两个质量级别下的版本——这是一对真正的配对样本，但从未用于训练，而且两者在编解码器*和* CRF 上同时存在差异。
 
-**Usable asset:** `act_express_2026-08-04_21-08-58-027924` is ACT trained 100k
-steps on `express` (51 episodes, q80 source, h264 CRF 0) — precisely the
-`jpeg80_crf0` cell of the test grid. Its config has `chunk_size=100`,
-`n_action_steps=100`, `temporal_ensemble_coeff=None`, `vision_backbone=resnet18`.
+**可用资产：** `act_express_2026-08-04_21-08-58-027924` 是在 `express`（51 个回合，q80 源，h264 CRF 0）上训练 100k 步的 ACT——恰好是测试网格中的 `jpeg80_crf0` 单元格。其配置为 `chunk_size=100`、`n_action_steps=100`、`temporal_ensemble_coeff=None`、`vision_backbone=resnet18`。
 
 ---
 
-## 3. Literature
+## 3. 文献综述
 
-### 3.1 The reference benchmark stops at pixels
+### 3.1 参考基准止步于像素层面
 
-LeRobot's own video benchmark ([PR #282](https://github.com/huggingface/lerobot/pull/282))
-sweeps `libx264`/`libx265`/`libsvtav1` × CRF {0, 5, 10, 15, 20, 25, 30, 40, 50, None}
-× GOP {1…40, None} × {yuv444p, yuv420p}, and reports `avg_mse`, `avg_psnr`,
-`avg_ssim` plus encode/decode timing. **No downstream model metric.**
+LeRobot 官方的视频基准（[PR #282](https://github.com/huggingface/lerobot/pull/282)）扫遍了 `libx264`/`libx265`/`libsvtav1` × CRF {0, 5, 10, 15, 20, 25, 30, 40, 50, None} × GOP {1…40, None} × {yuv444p, yuv420p}，报告了 `avg_mse`、`avg_psnr`、`avg_ssim` 以及编解码耗时。**没有下游模型指标。**
 
-This matters for positioning: `test_raw_jpeg` is already at parity with the
-reference benchmark on the pixel axis and past it on the feature axis. It also
-corrects a citation error in the field — [Robo-DM](https://arxiv.org/html/2505.15558v1)'s
-related-work section states that "LeRobot empirically evaluates how lossy video
-compression parameters in FFmpeg affect robot policy accuracy," which overstates
-what that benchmark computes.
+这对定位很重要：`test_raw_jpeg` 在像素轴上已与参考基准持平，在特征轴上则已超越。它还纠正了该领域的一处引用错误——[Robo-DM](https://arxiv.org/html/2505.15558v1) 的相关工作章节声称"LeRobot 实证评估了 FFmpeg 中有损视频压缩参数如何影响机器人策略精度"，这夸大了该基准实际计算的内容。
 
-### 3.2 The one paper that goes downstream, and its limits
+### 3.2 唯一触及下游的论文及其局限
 
-**Robo-DM** (arXiv [2505.15558](https://arxiv.org/html/2505.15558v1)) is the
-closest published work. Two relevant experiments:
+**Robo-DM**（arXiv [2505.15558](https://arxiv.org/html/2505.15558v1)）是最接近的已发表工作。两个相关实验：
 
-- *Octo fine-tuning:* validation MSE 1.86 (lossless) → 1.91 (lossy), reported as
-  a 2.6% increase. One condition pair, no seed replication.
-- *Physical Franka pick-and-place:* 335 trajectories at 75.3× lossy compression,
-  **15/15 success**.
+- *Octo 微调：* 验证 MSE 1.86（无损）→ 1.91（有损），报告为 2.6% 的上升。仅一组条件对，无种子重复。
+- *实体 Franka 抓取放置：* 335 条轨迹，75.3× 有损压缩，**15/15 成功**。
 
-The hardware result cannot support the conclusion it is used for. At n=15 with
-15 successes, the 95% Clopper–Pearson lower bound is ≈78% — the experiment
-cannot distinguish "no effect" from a drop to roughly 80%. It rules out
-catastrophic degradation and nothing finer. There is no train/deploy mismatch
-condition and no recording-side compression stage.
+该硬件结果无法支撑其被用于得出的结论。在 n=15 且 15 次全部成功的情况下，95% Clopper–Pearson 置信下界约为 78%——该实验无法区分"无影响"和"成功率跌至约 80%"。它只能排除灾难性退化，无法分辨更细微的差异。实验中没有训练/部署失配条件，也没有录制侧压缩阶段。
 
-Robo-DM also reports up to 70× size reduction versus the format Open X-Embodiment
-uses for distribution, which is the practical motivation for the whole question.
+Robo-DM 还报告了相对 Open X-Embodiment 分发格式最高 70× 的体积缩减，这正是整个问题的实际动机所在。
 
-### 3.3 Compression degrades vision tasks — established outside robotics
+### 3.3 压缩会损害视觉任务——机器人学之外已有定论
 
 **"A Perspective on Deep Vision Performance with Standard Image and Video Codecs"**
-(arXiv [2404.12330](https://arxiv.org/abs/2404.12330)) examines JPEG and H.264
-across classification, localization and dense prediction. From the abstract:
+（arXiv [2404.12330](https://arxiv.org/abs/2404.12330)）考察了 JPEG 和 H.264 在分类、定位和稠密预测任务上的影响。摘要指出：
 
-> "We find that using JPEG and H.264 coding significantly deteriorates the
-> accuracy across a broad range of vision tasks and models. For instance, strong
-> compression rates reduce semantic segmentation accuracy by more than 80% in
-> mIoU."
+> "我们发现，使用 JPEG 和 H.264 编码会在广泛的视觉任务和模型上显著降低精度。例如，强压缩率会使语义分割精度下降超过 80% mIoU。"
 
-The key structural finding is that **dense prediction degrades far faster than
-classification**. This is the most transferable result for manipulation: a
-visuomotor policy reading wrist cameras for contact-level geometry is closer to
-dense prediction than to classification, which argues the classification-derived
-intuition ("q80 is basically free") is the wrong prior.
+关键的结构性结论是：**稠密预测的退化速度远快于分类**。这是对操作任务最具可迁移性的结果：一个读取腕部相机以获取接触级几何信息的视觉运动策略，更接近稠密预测而非分类，这意味着从分类任务得出的直觉（"q80 基本无损"）是错误的先验。
 
-*(unverified)* Search snippets attribute to this paper a 3.1% ResNet-50 top-1
-drop at JPEG q80 and 1.9% at q90; the PDF did not extract cleanly and these
-numbers were not confirmed in-text. Verify before citing.
+*（未验证）* 搜索摘要将该论文归因了 JPEG q80 下 ResNet-50 top-1 下降 3.1%、q90 下下降 1.9% 的数据；但 PDF 未能完整提取，这些数字未在正文中得到确认。引用前请核实。
 
-Counter-literature worth noting for balance: several works report compression
-*helping* classification ([Compression Helps Deep Learning in Image
-Classification](https://www.mdpi.com/1099-4300/23/7/881)), typically via a
-denoising/regularization effect. The effect is task- and dataset-dependent and
-does not generalize to fine-grained spatial tasks.
+为平衡起见值得注意的反向文献：若干工作报告压缩*有益于*分类任务（[Compression Helps Deep Learning in Image Classification](https://www.mdpi.com/1099-4300/23/7/881)），通常归因于去噪/正则化效应。该效应依赖于任务和数据集，不能推广到细粒度空间任务。
 
-**ImageNet-C** includes JPEG compression as one of its 15 standard corruption
-types, so compression-as-corruption is long-established methodology.
-**RobustNav** ([arXiv 2106.04531](https://arxiv.org/pdf/2106.04531)) ports this
-to embodied navigation with 7 visual corruptions. On the manipulation side,
-LIBERO-Plus and VLATest cover layout, appearance, viewpoint, lighting and sensor
-noise — but codec artifacts specifically are not in these suites.
+**ImageNet-C** 将 JPEG 压缩列为其 15 种标准腐坏类型之一，因此"压缩作为腐坏"是早已确立的方法论。
+**RobustNav**（[arXiv 2106.04531](https://arxiv.org/pdf/2106.04531)）将这一思路移植到具身导航，包含 7 种视觉腐坏。在操作任务一侧，LIBERO-Plus 和 VLATest 覆盖了布局、外观、视角、光照和传感器噪声——但编解码伪影 specifically 不在这些测试套件中。
 
-### 3.4 Pixel metrics don't predict machine task performance — a whole field says so
+### 3.4 像素指标无法预测机器任务性能——一整个领域都这么说
 
-**Video Coding for Machines (VCM)** exists as an MPEG standardization line
-precisely because PSNR/SSIM/VMAF do not align with machine task performance.
-Task metrics (mAP@[0.5:0.95], mIoU, MOTA) replace pixel fidelity in the
-evaluation, and codec designs that optimize rate–task tradeoffs differ
-structurally from human-oriented codecs
-([survey](https://arxiv.org/pdf/2001.03569)).
+**面向机器的视频编码（Video Coding for Machines, VCM）** 之所以作为 MPEG 的一条标准化路线存在，正是因为 PSNR/SSIM/VMAF 与机器任务性能不一致。任务指标（mAP@[0.5:0.95]、mIoU、MOTA）在评估中取代了像素保真度，而优化码率–任务权衡的编解码器设计在结构上与面向人类的编解码器不同（[综述](https://arxiv.org/pdf/2001.03569)）。
 
-VCM also anticipates a second problem the `test_raw_jpeg` report ran into
-independently: single-model evaluation is biased. **Satisfied Machine Ratio**
-(arXiv [2211.06797](https://arxiv.org/html/2211.06797)) aggregates quality
-judgments across many machine models for exactly this reason. The report's
-observation that CLS cosine at `raw_crf30` ranges from 0.8628 to 0.9169 across
-three backbones — against a single PSNR value — is the same phenomenon, and the
-three-backbone design is the right response.
+VCM 还预见了 `test_raw_jpeg` 报告独立撞上的第二个问题：单模型评估存在偏差。**Satisfied Machine Ratio**（arXiv [2211.06797](https://arxiv.org/html/2211.06797)）正是出于这个原因，在多个机器模型上聚合质量判断。报告观察到 `raw_crf30` 下的 CLS 余弦相似度在三个骨干网络上从 0.8628 到 0.9169 不等——而 PSNR 只有单一数值——这是同一现象，三骨干设计是正确的应对。
 
-**Implication for the report:** its §阶段三 conclusion (PSNR orders correctly but
-cannot serve as an acceptance threshold — ρ=0.927 vs r=0.753, with 30–100× more
-CLS movement per dB below 40 dB than above 43 dB) is an independent rediscovery
-of the VCM premise on robotics data. That is a citable framing, not a caveat.
+**对报告的启示：** 其 §阶段三 的结论（PSNR 排序正确但不能作为验收阈值——ρ=0.927 对比 r=0.753，且低于 40 dB 时每 dB 对应的 CLS 变化量比高于 43 dB 时大 30–100 倍）是在机器人数据上对 VCM 前提的一次独立再发现。这是一个可引用的框架定位，而不是一个缺陷声明。
 
-### 3.5 Offline action error is a weak proxy for closed-loop success
+### 3.5 离线动作误差是闭环成功率的弱代理
 
-This is the sharpest constraint on any cheap experiment.
+这是对任何低成本实验最尖锐的约束。
 
-**RoboMimic** ([study](https://robomimic.github.io/study/)) found the
-best-validation-loss checkpoint is **50–100% worse** than the best-performing
-checkpoint. Validation loss is a surrogate; policies are not selected by it in
-practice for good reason.
+**RoboMimic**（[研究](https://robomimic.github.io/study/)）发现，验证损失最优的检查点比实际表现最优的检查点**差 50–100%**。验证损失只是一个代理指标；实践中不据此选择策略是有充分理由的。
 
-**Critical Interval MSE** (arXiv [2606.29898](https://arxiv.org/pdf/2606.29898))
-diagnoses why: plain action MSE weights every timestep equally, while errors
-during task-critical phases (approach, contact, grasp, insertion) dominate
-outcomes. CI-MSE weights errors by criticality and reports substantially higher
-correlation with closed-loop success across ManiSkill2, LIBERO and RoboArena.
-*(The specific correlation coefficients did not extract from the PDF — fetch the
-tables before citing numbers.)*
+**Critical Interval MSE**（arXiv [2606.29898](https://arxiv.org/pdf/2606.29898)）诊断了原因：普通的动作 MSE 对所有时间步等权重处理，而任务关键阶段（接近、接触、抓取、插入）的误差主导了最终结果。CI-MSE 按关键性加权误差，并报告了在 ManiSkill2、LIBERO 和 RoboArena 上与闭环成功率显著更高的相关性。*（具体的相关系数未能从 PDF 中提取——引用数字前请先抓取表格。）*
 
-**Consequences for our design:**
+**对我们实验设计的影响：**
 
-1. Validation action MSE is usable as a *screen* — it can establish that two
-   compression conditions are indistinguishable — but cannot certify one as
-   better.
-2. Any Δaction metric should be weighted toward the grasp and insertion windows
-   of the `express` task rather than averaged over all 1103 frames. A 2 mm
-   commanded-TCP shift during free transport is irrelevant; the same shift at
-   contact is not.
+1. 验证集动作 MSE 可作为*筛查*手段——它可以确立两个压缩条件之间不可区分——但不能用来认证某个条件更优。
+2. 任何 Δ动作指标都应向 `express` 任务的抓取和插入窗口加权，而不是对全部 1103 帧取平均。自由搬运阶段 2 mm 的指令 TCP 偏移无关紧要；同样的偏移发生在接触时则不然。
 
-### 3.6 Closed-loop evaluation statistics
+### 3.6 闭环评估的统计功效
 
-Current practice is badly underpowered, and this is now well documented.
+当前实践的统计功效严重不足，而这已有充分文献记载。
 
-- Typical real-robot comparisons use 20–30 trials; most fall in a 10–50 rollout
-  regime ([N-SCORE](https://arxiv.org/html/2603.13616)).
-- Precision cost: an observed 90% success rate at 70 rollouts gives a 95%
-  Clopper–Pearson interval of [80.5%, 95.9%] — 15.4 pp wide. Tightening to
-  ±2 pp requires ~1,030 rollouts, roughly 15× more.
-- Fixed-sample two-proportion tests at α=0.05, 80% power: detecting 90%→70%
-  needs ~62 trials per arm; 90%→80% needs ~200 per arm.
+- 典型的真机对比使用 20–30 次试验；多数处于 10–50 次 rollout 的区间（[N-SCORE](https://arxiv.org/html/2603.13616)）。
+- 精度代价：70 次 rollout 观察到 90% 成功率，其 95% Clopper–Pearson 区间为 [80.5%, 95.9%]——宽 15.4 个百分点。要收紧到 ±2 个百分点需要约 1,030 次 rollout，约为 15 倍。
+- 固定样本的双比例检验（α=0.05，功效 80%）：检测 90%→70% 的差异每组约需 62 次试验；90%→80% 每组约需 200 次。
 
-Two methods reduce this materially and both apply directly:
+有两种方法能实质性地降低这一成本，且都可直接应用：
 
-**STEP** (arXiv [2503.10966](https://arxiv.org/html/2503.10966)) — sequential
-testing with control-theoretic decision regions over binary outcomes; stops
-early once evidence is sufficient. Approaches oracle SPRT performance for 5–10 pp
-gaps, where asymptotic methods fail in finite samples.
+**STEP**（arXiv [2503.10966](https://arxiv.org/html/2503.10966)）——基于控制论决策区域的序贯检验，处理二元结果；证据充分时提前停止。对于 5–10 个百分点的差距，其性能逼近理想的 SPRT，而渐近方法在有限样本下失效。
 
-**N-SCORE** (arXiv [2603.13616](https://arxiv.org/html/2603.13616)) — sequential
-comparison over *graded* outcomes. Its framing of why binary scoring wastes data:
+**N-SCORE**（arXiv [2603.13616](https://arxiv.org/html/2603.13616)）——针对*分级*结果的序贯比较。其对二元评分浪费数据的论述：
 
-> "a policy that completes 90% of the task is clearly better than a policy that
-> is frozen the whole time, yet their success rates would be identically 0%."
+> "一个完成了 90% 任务的策略显然优于一个全程卡死的策略，但两者的成功率会同样是 0%。"
 
-Reported savings: up to 70% fewer evaluations versus batch methods using partial
-credit, up to 50% versus binary sequential procedures; on hardware, 50 nominal
-rollouts reduce to ~38–42; on RoboArena real-world data, 1,419 trials versus
-1,881 to separate four policies.
+报告的节省幅度：使用部分给分相对批量方法最多减少 70% 的评估次数，相对二元序贯程序最多减少 50%；在硬件上，名义 50 次 rollout 可减少至约 38–42 次；在 RoboArena 真实数据上，区分四个策略用了 1,419 次试验而非 1,881 次。
 
-**Consequence:** a graded rubric (approach / grasp / transport / place, weighted)
-plus sequential stopping is the difference between a feasible closed-loop
-experiment and an infeasible one. Binary success at n=15, as in Robo-DM, is not
-an experiment.
+**推论：** 分级评分量表（接近 / 抓取 / 搬运 / 放置，加权）加上序贯停止，就是可行与不可行的闭环实验之间的差别。像 Robo-DM 那样在 n=15 下做二元成功判定，算不上实验。
 
-### 3.7 Train/deploy codec mismatch — named failure mode in adjacent fields
+### 3.7 训练/部署编解码器失配——相邻领域已命名的失效模式
 
-Not yet studied in robotics, but well characterized elsewhere. In synthetic-image
-detection and document forensics, the mismatch between the narrow set of JPEG
-quantization tables seen in training and the heterogeneous compression profiles
-of real deployment pipelines is a *primary* source of generalization gap
-([DocQT, arXiv 2605.19688](https://arxiv.org/html/2605.19688)). The standard
-mitigation is JPEG-compression augmentation during training.
+机器人学中尚未研究，但在其他领域已有充分刻画。在合成图像检测和文档取证领域，训练中所见的狭窄 JPEG 量化表集合与真实部署管线中异构压缩配置之间的失配，是泛化差距的*首要*来源（[DocQT, arXiv 2605.19688](https://arxiv.org/html/2605.19688)）。标准的缓解手段是在训练时做 JPEG 压缩数据增强。
 
-This maps directly onto our deployment: the policy trains on h264-decoded frames
-and infers on live q80 JPEG frames from `realsense_node.cpp`. Same mechanism,
-untested in this domain.
+这直接映射到我们的部署场景：策略在 h264 解码的帧上训练，却在来自 `realsense_node.cpp` 的实时 q80 JPEG 帧上推理。同一机制，在本领域未经测试。
 
-Adjacent but distinct: **Quantization-Aware Imitation Learning**
-(arXiv [2412.01034](https://arxiv.org/pdf/2412.01034)) compresses the *model*,
-not the data.
+相邻但不同：**Quantization-Aware Imitation Learning**（arXiv [2412.01034](https://arxiv.org/pdf/2412.01034)）压缩的是*模型*，而非数据。
 
 ---
 
-## 4. Gap analysis
+## 4. 空白分析
 
-Published:
+已发表的：
 
-- pixel-level rate–distortion for robot dataset codecs (LeRobot benchmark)
-- one downstream data point at one compression level (Robo-DM), underpowered
-- compression degrades vision tasks, dense prediction worst (2404.12330)
-- pixel metrics ≠ machine task metrics (VCM, an entire subfield)
-- offline action error ≠ closed-loop success (RoboMimic, CI-MSE)
-- how to run adequately powered policy comparisons (STEP, N-SCORE)
+- 机器人数据集编解码器的像素级码率–失真特性（LeRobot 基准）
+- 一个压缩级别下的一个下游数据点（Robo-DM），功效不足
+- 压缩损害视觉任务，稠密预测受害最重（2404.12330）
+- 像素指标 ≠ 机器任务指标（VCM，一整个子领域）
+- 离线动作误差 ≠ 闭环成功率（RoboMimic、CI-MSE）
+- 如何进行功效充分的策略对比（STEP、N-SCORE）
 
-Not found in the literature:
+文献中未找到的：
 
-1. **The recording-side × storage-side cascade.** Every study treats compression
-   as one stage. Production pipelines have two — camera-side JPEG then
-   dataset-side video codec — and the report's central finding is that they
-   interact non-monotonically (q80→CRF 0 is strictly dominated: larger files
-   than raw→CRF 20 at equal quality, because low CRF faithfully preserves JPEG
-   block noise).
-2. **Train/deploy codec mismatch for robot policies.** Named and studied in
-   forensics, absent in robot learning, and structurally present in every
-   deployed LeRobot system.
-3. **Per-camera asymmetry under a mosaic layout.** The head/wrist 6–7 dB split
-   caused by 2× upscaled head tiles, with the wrists — the cameras that matter
-   for fine manipulation — taking the loss. Follows from the recording format,
-   not from the codec.
-4. **Systematic per-frame quality alternation from GOP=2.** A 1.3–1.4 dB I/P
-   oscillation at 15 Hz baked into every LeRobot dataset stored at CRF 20. Its
-   effect on temporal modeling is unexamined anywhere.
+1. **录制侧 × 存储侧的级联。** 每项研究都把压缩当作单一阶段处理。生产管线有两个阶段——相机侧 JPEG，然后是数据集侧视频编解码——而报告的核心发现是二者以非单调方式相互作用（q80→CRF 0 被严格支配：同等质量下文件比 raw→CRF 20 更大，因为低 CRF 忠实地保留了 JPEG 块噪声）。
+2. **机器人策略的训练/部署编解码器失配。** 在取证领域已被命名和研究，在机器人学习中完全缺失，却在每个已部署的 LeRobot 系统中结构性存在。
+3. **拼接布局下的逐相机不对称。** 由头部图块 2× 放大导致的头部/腕部 6–7 dB 分化，承受损失的是腕部——对精细操作最重要的相机。这源于录制格式，而非编解码器。
+4. **GOP=2 带来的系统性逐帧质量交替。** 以 CRF 20 存储的每个 LeRobot 数据集中都固化着 15 Hz 的 1.3–1.4 dB I/P 振荡。其对时序建模的影响在任何地方都未被考察。
 
-Items 1–2 are the publishable core. Item 4 is a LeRobot-wide observation.
+第 1–2 项是可发表的核心。第 4 项是一个 LeRobot 全局性的观察。
 
 ---
 
-## 5. Resulting experimental design
+## 5. 由此得出的实验设计
 
-Three rungs, cheapest first. Rung 1 uses only assets already on disk.
+三个层级，从最便宜的开始。第 1 级只使用磁盘上已有的资产。
 
-### Rung 1 — action sensitivity of a fixed policy (~1 GPU-hour)
+### 第 1 级——固定策略的动作敏感性（约 1 GPU 小时）
 
-Run the frozen `act_express` checkpoint over all 11 image variants × 1103
-frames, holding state input identical. ACT zeroes the VAE latent at inference,
-so it is deterministic: every output difference is attributable to pixels, with
-no seed noise.
+在全部 11 种图像变体 × 1103 帧上运行冻结的 `act_express` 检查点，保持状态输入不变。ACT 在推理时将 VAE 隐变量置零，因此是确定性的：每一个输出差异都可归因于像素，无种子噪声。
 
-Measure:
+测量内容：
 
-1. **Δaction in radians**, per joint, mean / p95 / max. Two reference points:
-   vs `jpeg80_crf0` answers "what breaks if I change storage under a deployed
-   policy"; vs `raw` answers "what did compression cost".
-2. **Normalized by the policy's own error** `E = ‖predicted − ground-truth teleop‖`
-   on the reference variant. The decision quantity is Δ/E. Without this
-   denominator a radian figure is uninterpretable.
-3. **Criticality-weighted**, per §3.5 — grasp and insertion windows separated
-   from free transport.
-4. **By chunk position**, k=0..9 versus the tail. This configuration has
-   `n_action_steps=100` and `temporal_ensemble_coeff=None`: one observation
-   determines 3.3 s of motion at 30 fps, with no temporal averaging to attenuate
-   per-frame compression noise. This policy is unusually exposed, and that is
-   worth reporting independently.
-5. **Temporal structure of Δ** — specifically whether the GOP=2 15 Hz
-   oscillation propagates into the action. i.i.d. frame noise is benign;
-   correlated noise is not.
-6. **Gripper channel separately** — a flip differs qualitatively from a joint
-   wobble.
-7. **Task-space conversion** via FK to mm of commanded TCP displacement, if the
-   URDF is available.
+1. **Δ动作（弧度）**，逐关节，均值 / p95 / 最大值。两个参照点：对比 `jpeg80_crf0` 回答"在已部署策略下更换存储会破坏什么"；对比 `raw` 回答"压缩的代价是什么"。
+2. **以策略自身误差归一化** `E = ‖预测 − 遥操作真值‖`，在参考变体上计算。决策量是 Δ/E。没有这个分母，弧度数值无法解释。
+3. **关键性加权**，依 §3.5——将抓取和插入窗口与自由搬运分开。
+4. **按 chunk 位置分解**，k=0..9 对比尾部。该配置下 `n_action_steps=100` 且 `temporal_ensemble_coeff=None`：一次观测决定 30 fps 下 3.3 秒的运动，没有任何时序平均来衰减逐帧压缩噪声。这个策略异常暴露，这一点值得单独报告。
+5. **Δ 的时序结构**——具体而言，GOP=2 的 15 Hz 振荡是否会传播到动作中。独立同分布的帧噪声是良性的；相关噪声则不然。
+6. **夹爪通道单独分析**——一次翻转与关节抖动在性质上不同。
+7. **通过正运动学转换到任务空间**，以指令 TCP 位移的毫米数表示，前提是 URDF 可用。
 
-Cheap addition: repeat the DINO cosine analysis on the policy's own ResNet18
-backbone, testing whether generic-backbone drift is a valid proxy for the
-policies actually being trained — currently an untested assumption in §阶段三.
+低成本附加项：在策略自己的 ResNet18 骨干上重复 DINO 余弦分析，检验通用骨干的漂移是否是实际训练中的策略的有效代理——目前这在 §阶段三 中是一个未经检验的假设。
 
-Rung 1 measures the *mismatch* axis only. A policy trained on CRF-30 data may
-learn compression-robust features while a CRF-0-trained policy fed CRF-30 images
-fails. That requires training.
+第 1 级只测量*失配*轴。在 CRF-30 数据上训练的策略可能学到抗压缩特征，而在 CRF-0 上训练的策略喂入 CRF-30 图像时却失败。这需要训练来回答。
 
-### Rung 2 — train the grid; open-loop error and the mismatch matrix
+### 第 2 级——训练网格；开环误差与失配矩阵
 
-Measured cost from the existing job: 100k steps, batch 8, 49,843 frames →
-**3h08m, 5.8 GB VRAM**. Two GPUs available.
+从现有任务实测的成本：100k 步，batch 8，49,843 帧 → **3 小时 08 分，5.8 GB 显存**。有两块 GPU 可用。
 
-| variant | data required | runs | GPU-h | wall (2 GPU) |
+| 变体 | 所需数据 | 运行数 | GPU 时 | 墙钟时间（2 GPU） |
 |---|---|---:|---:|---:|
-| **2a** CRF axis: q80 × CRF {0,20,30,40} × 3 seeds | re-convert 51 existing bags | 12 | 38 | ~19 h |
-| **2b** full grid: {raw, q100, q80} × CRF {0,20,30} × 3 seeds | ~50 raw episodes ≈ 310 GB | 27 | 85 | ~43 h |
+| **2a** CRF 轴：q80 × CRF {0,20,30,40} × 3 种子 | 重新转换现有 51 个 bag | 12 | 38 | 约 19 小时 |
+| **2b** 完整网格：{raw, q100, q80} × CRF {0,20,30} × 3 种子 | 约 50 个 raw 回合 ≈ 310 GB | 27 | 85 | 约 43 小时 |
 
-2a answers "how cheap can storage get" but cannot answer "what did q80 cost me" —
-only one raw episode exists, and one episode does not train a policy. 2b requires
-a raw recording campaign (6.2 GiB per 37 s episode); the payoff is that
-`02_build_jpeg_bag.py` then synthesizes q100/q80 from those exact frames, giving
-identical trajectories across conditions — an internal validity almost no
-published compression study achieves.
+2a 回答"存储可以便宜到什么程度"，但无法回答"q80 让我付出了什么"——只存在一个 raw 回合，而一个回合训不出策略。2b 需要一次 raw 录制行动（每个 37 秒回合 6.2 GiB）；回报是 `02_build_jpeg_bag.py` 随后可以从完全相同的帧合成 q100/q80，使各条件下的轨迹完全一致——这是几乎所有已发表压缩研究都未达到的内部效度。
 
-Non-negotiable design points:
+不可妥协的设计要点：
 
-- **≥3 seeds per condition.** The seed spread is the noise floor; differences
-  below it are unmeasurable at this budget, and for CRF 20 vs CRF 0 they
-  plausibly will be. No existing job here has ever varied the seed.
-- **Pre-registered non-inferiority margin**, declared before running.
-- **Mismatch matrix** `M[i][j]` = policy trained on condition *i*, evaluated on
-  *j*. Off-diagonal minus diagonal is the domain gap. Column `j = jpeg_q80` is
-  the production column — that is what the camera delivers at deploy time.
-- Per §3.5, val MSE screens but does not certify. Report CI-MSE-style weighted
-  error alongside it.
+- **每个条件 ≥3 个种子。** 种子散布就是噪声底线；低于它的差异在此预算下不可测量，而 CRF 20 与 CRF 0 之间的差异很可能就低于它。这里现有的任务从未变动过种子。
+- **预注册的非劣效界值**，在运行之前声明。
+- **失配矩阵** `M[i][j]` = 在条件 *i* 上训练的策略、在条件 *j* 上评估。非对角线减去对角线即为域差距。`j = jpeg_q80` 列是生产环境列——那是相机在部署时实际交付的数据。
+- 依 §3.5，验证 MSE 用于筛查但不用于认证。同时报告 CI-MSE 风格的加权误差。
 
-### Rung 3 — closed-loop success
+### 第 3 级——闭环成功率
 
-The only metric that answers the question, and the reason rungs 1–2 exist is to
-arrive here with two candidates rather than nine.
+唯一能回答问题的指标，而第 1–2 级存在的意义就是带着两个而非九个候选方案抵达这里。
 
-Protocol, following §3.6:
+协议，遵循 §3.6：
 
-- Graded rubric with partial credit (approach / grasp / transport / place),
-  not binary success — this is where the 50–70% sample savings come from.
-- Sequential stopping (STEP for binary, N-SCORE for graded) rather than a fixed
-  batch.
-- Fixed initial-state jig; interleaved randomized condition order; operator blind
-  to condition.
-- Intervention count and time-to-completion as continuous secondaries.
+- 带部分给分的分级量表（接近 / 抓取 / 搬运 / 放置），而非二元成功——50–70% 的样本节省正来自这里。
+- 序贯停止（二元用 STEP，分级用 N-SCORE），而非固定批量。
+- 固定初始状态工装；交错随机的条件顺序；操作员对条件盲测。
+- 干预次数和完成时间作为连续型次要指标。
 
-Budget expectation: ~40 s per trial plus reset; ~40 graded trials per condition
-under sequential stopping, versus ~62 binary trials fixed-sample for a 20 pp
-effect. Anything smaller than ~10 pp is out of reach on hardware and should be
-settled at rungs 1–2 or in simulation.
+预算预期：每次试验约 40 秒加复位；序贯停止下每个条件约 40 次分级试验，而固定样本二元检验在 20 个百分点效应量下约需 62 次。小于约 10 个百分点的效应在硬件上无法企及，应在第 1–2 级或仿真中解决。
 
-If compression studies recur, a simulator for the `express` task is the highest-
-leverage infrastructure investment available — it converts rung 3 from hours of
-robot time into minutes of GPU time, and the evaluation-in-simulation literature
-([arXiv 2510.04354](https://arxiv.org/html/2510.04354)) addresses the fidelity
-caveat directly.
+如果压缩研究会反复开展，为 `express` 任务构建仿真器是现有杠杆最高的基础设施投资——它把第 3 级从数小时的机器人时间变成几分钟的 GPU 时间，而仿真评估文献（[arXiv 2510.04354](https://arxiv.org/html/2510.04354)）直接回应了保真度方面的顾虑。
 
 ---
 
-## 6. Positioning for publication
+## 6. 发表定位
 
-The pixel and feature work is done and is already past the field's reference
-benchmark. What would make it a contribution rather than an internal report:
+像素和特征层面的工作已完成，且已超越该领域的参考基准。要让它成为一项贡献而非内部报告，需要：
 
-1. Rung 1 — the train/deploy mismatch measurement. ~1 GPU-hour, data on disk.
-2. Rung 2a — the CRF axis at training scale with seed replication. ~19 h wall,
-   no new recording.
-3. Rung 2b + rung 3 — the raw→q80 question and closed-loop confirmation. Requires
-   a recording campaign and robot time.
+1. 第 1 级——训练/部署失配测量。约 1 GPU 小时，数据在磁盘上。
+2. 第 2a 级——训练规模下的 CRF 轴，带种子重复。约 19 小时墙钟时间，无需新录制。
+3. 第 2b 级 + 第 3 级——raw→q80 问题和闭环确认。需要录制行动和机器人时间。
 
-(1) and (2) together already constitute the first controlled study of
-compression-induced train/deploy mismatch in robot learning, with an internal
-validity — byte-identical actions across conditions — that the existing
-literature does not have.
+(1) 和 (2) 合在一起，已经构成对机器人学习中压缩导致的训练/部署失配的首个受控研究，且具有一项现有文献不具备的内部效度——各条件下逐字节一致的动作。
 
-Note that `test_raw_jpeg/{intermediate,results,lerobot,bags}/` have been deleted
-and `run_all.sh` referenced in the README does not exist; stages 1–3 must be
-re-run before rung 1 has frames.
+注意：`test_raw_jpeg/{intermediate,results,lerobot,bags}/` 已被删除，README 中引用的 `run_all.sh` 并不存在；在第 1 级获得帧数据之前，必须先重跑阶段 1–3。
 
 ---
 
-## Sources
+## 来源
 
-**Directly relevant, verified**
+**直接相关，已验证**
 
-- [Improve video benchmark · PR #282 · huggingface/lerobot](https://github.com/huggingface/lerobot/pull/282) — reference codec benchmark, pixel metrics only
-- [Robo-DM: Data Management For Large Robot Datasets](https://arxiv.org/html/2505.15558v1) — the only downstream compression evaluation; underpowered
-- [What Matters in Learning from Offline Human Demonstrations (robomimic)](https://robomimic.github.io/study/) — validation loss a poor predictor
-- [Critical Interval MSE](https://arxiv.org/pdf/2606.29898) — criticality-weighted offline validation
-- [Is Your Imitation Learning Policy Better than Mine? (STEP)](https://arxiv.org/html/2503.10966) — sequential policy comparison
-- [Beyond Binary Success (N-SCORE)](https://arxiv.org/html/2603.13616) — graded outcomes, sample efficiency
-- [A Perspective on Deep Vision Performance with Standard Image and Video Codecs](https://arxiv.org/abs/2404.12330) — JPEG/H.264 across vision tasks
+- [Improve video benchmark · PR #282 · huggingface/lerobot](https://github.com/huggingface/lerobot/pull/282) — 参考编解码基准，仅像素指标
+- [Robo-DM: Data Management For Large Robot Datasets](https://arxiv.org/html/2505.15558v1) — 唯一的下游压缩评估；功效不足
+- [What Matters in Learning from Offline Human Demonstrations (robomimic)](https://robomimic.github.io/study/) — 验证损失是糟糕的预测指标
+- [Critical Interval MSE](https://arxiv.org/pdf/2606.29898) — 关键性加权的离线验证
+- [Is Your Imitation Learning Policy Better than Mine? (STEP)](https://arxiv.org/html/2503.10966) — 序贯策略比较
+- [Beyond Binary Success (N-SCORE)](https://arxiv.org/html/2603.13616) — 分级结果，样本效率
+- [A Perspective on Deep Vision Performance with Standard Image and Video Codecs](https://arxiv.org/abs/2404.12330) — 视觉任务上的 JPEG/H.264
 
-**Context**
+**背景**
 
 - [Video Coding for Machines: A Paradigm of Collaborative Compression and Intelligent Analytics](https://arxiv.org/pdf/2001.03569)
 - [Perceptual Video Coding for Machines via Satisfied Machine Ratio Modeling](https://arxiv.org/html/2211.06797)
 - [RobustNav: Benchmarking Robustness in Embodied Navigation](https://arxiv.org/pdf/2106.04531)
 - [Open X-Embodiment](https://arxiv.org/html/2310.08864v4)
 - [Reliable and Scalable Robot Policy Evaluation with Imperfect Simulators](https://arxiv.org/html/2510.04354)
-- [DocQT: JPEG Quantization Table Mismatch](https://arxiv.org/html/2605.19688) — train/deploy codec gap in an adjacent field
-- [Compression Helps Deep Learning in Image Classification](https://www.mdpi.com/1099-4300/23/7/881) — counter-evidence
-- [Quantization-Aware Imitation-Learning](https://arxiv.org/pdf/2412.01034) — model compression, adjacent
+- [DocQT: JPEG Quantization Table Mismatch](https://arxiv.org/html/2605.19688) — 相邻领域的训练/部署编解码器差距
+- [Compression Helps Deep Learning in Image Classification](https://www.mdpi.com/1099-4300/23/7/881) — 反面证据
+- [Quantization-Aware Imitation-Learning](https://arxiv.org/pdf/2412.01034) — 模型压缩，相邻方向
 
-**Searched, nothing found**
+**已检索，未发现**
 
-No study located on: codec artifacts in manipulation robustness suites; JPEG-quality
-ablations for ACT or diffusion policies; recording-side × storage-side compression
-cascades; or compression train/deploy mismatch matrices for robot policies. Absence
-of search hits is not proof of absence — a proper database sweep (IEEE Xplore, ACM DL,
-Semantic Scholar API) is warranted before asserting novelty in a submission.
+未找到以下方向的研究：操作鲁棒性测试套件中的编解码伪影；ACT 或扩散策略的 JPEG 质量消融；录制侧 × 存储侧压缩级联；机器人策略的压缩训练/部署失配矩阵。检索无果并非不存在的证明——在投稿中断言新颖性之前，应进行正规的数据库检索（IEEE Xplore、ACM DL、Semantic Scholar API）。
