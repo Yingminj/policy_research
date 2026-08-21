@@ -104,10 +104,26 @@ Secondary observations:
 
 ## 3. Recommendations, in priority order
 
-1. **Add a held-out eval split.** Plumb `dataset.eval_split` / `eval_steps` through the LeLab job
-   config (they already exist in `configs/train.py`, they are simply not exposed). Without this,
-   no statement about any of these five policies vs. the baseline can be supported by the loss curve.
-   This is the only item that changes what you can conclude.
+1. **Score existing checkpoints on `batch_1`–`batch_6` — no retraining needed.**
+   `batch_success_361` is exactly `batch_7` (163 eps) + `batch_8` (200 eps), verified by
+   episode-length subsequence match (163+200=363). So `batch_1`–`batch_6` (384 episodes, same task)
+   were never seen by `act_dit`, `patch_policy`, `vita`, or the `act` baseline, and all six have a
+   feature set identical to the training data (16-dim state/action, same three cameras) — existing
+   checkpoints load against them directly.
+
+   Score them with **sampled** actions (`predict_action_chunk`) and report denormalized joint-space
+   L1/MSE. That is comparable across all six policies; each policy's own training objective is not.
+   Caveat: `batch_1`–`batch_6` are older sessions, so this reads as a cross-session generalization
+   probe rather than an iid validation split — which is the more informative reading given the
+   known background-cue reliance.
+
+   Note what `eval_steps` does *not* give you: `lerobot_train.py:623` calls `policy.forward()` on
+   held-out batches, i.e. the *training* loss on unseen data. It is only comparable within one
+   policy across checkpoints (L1+KL vs velocity-MSE vs epsilon-MSE are different scales), it is
+   stochastic for the three denoising policies, and it costs ~10% of training episodes. Its real
+   value is narrower than stated in an earlier draft of this report: within-run checkpoint selection
+   and answering whether the epochs after ~1 buy anything.
+
 2. **Give `act_dit` a scheduler.** It is the only one running a 10× LR flat to the end.
    `CosineAnnealingWithWarmupSchedulerConfig(num_warmup_steps=500)` is already registered in
    `optim/schedulers.py:104` — a five-line `get_scheduler_preset()` in
