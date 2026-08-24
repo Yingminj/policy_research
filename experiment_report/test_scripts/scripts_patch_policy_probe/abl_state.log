@@ -1,0 +1,14 @@
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK
+[state] {'step': 2500, 'train_loss': 0.09029, 'policy': 0.229546, 'hold_state': 0.123333, 'policy_first': 0.237397, 'hold_first': 0.018378, 'policy_exec': 0.229403, 'hold_exec': 0.074876, 'waypoint': 0.231657, 'waypoint_reanchored': 0.127221, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.537, 'exec_gain_vs_null': 0.326, 'waypoint_gain_vs_null': 0.191}  (788s)
+[state] {'step': 5000, 'train_loss': 0.06948, 'policy': 0.193732, 'hold_state': 0.123333, 'policy_first': 0.170958, 'hold_first': 0.018378, 'policy_exec': 0.182393, 'hold_exec': 0.074876, 'waypoint': 0.174848, 'waypoint_reanchored': 0.096718, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.637, 'exec_gain_vs_null': 0.411, 'waypoint_gain_vs_null': 0.253}  (1581s)
+[state] {'step': 7500, 'train_loss': 0.05786, 'policy': 0.168846, 'hold_state': 0.123333, 'policy_first': 0.153599, 'hold_first': 0.018378, 'policy_exec': 0.154603, 'hold_exec': 0.074876, 'waypoint': 0.147483, 'waypoint_reanchored': 0.091503, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.73, 'exec_gain_vs_null': 0.484, 'waypoint_gain_vs_null': 0.299}  (2385s)
+[state] {'step': 10000, 'train_loss': 0.05321, 'policy': 0.170273, 'hold_state': 0.123333, 'policy_first': 0.14495, 'hold_first': 0.018378, 'policy_exec': 0.15629, 'hold_exec': 0.074876, 'waypoint': 0.1444, 'waypoint_reanchored': 0.092788, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.724, 'exec_gain_vs_null': 0.479, 'waypoint_gain_vs_null': 0.306}  (3195s)
+[state] {'step': 12500, 'train_loss': 0.04985, 'policy': 0.159694, 'hold_state': 0.123333, 'policy_first': 0.134101, 'hold_first': 0.018378, 'policy_exec': 0.143942, 'hold_exec': 0.074876, 'waypoint': 0.133424, 'waypoint_reanchored': 0.084025, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.772, 'exec_gain_vs_null': 0.52, 'waypoint_gain_vs_null': 0.331}  (4013s)
+[state] {'step': 15000, 'train_loss': 0.04692, 'policy': 0.144809, 'hold_state': 0.123333, 'policy_first': 0.117838, 'hold_first': 0.018378, 'policy_exec': 0.1287, 'hold_exec': 0.074876, 'waypoint': 0.120165, 'waypoint_reanchored': 0.074385, 'waypoint_hold': 0.04417, 'anchors': 128, 'gain_vs_null': 0.852, 'exec_gain_vs_null': 0.582, 'waypoint_gain_vs_null': 0.368}  (4832s)

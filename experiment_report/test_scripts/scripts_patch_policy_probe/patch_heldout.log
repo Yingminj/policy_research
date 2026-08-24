@@ -1,0 +1,18 @@
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+Loading weights from local directory
+contamination filter: 363 training episodes fingerprinted
+[tidy_up_stationery_le/batch_1] 2322 anchors  policy_mae=0.14008  hold_state_mae=0.10395  (304s)
+[tidy_up_stationery_le/batch_2] 1079 anchors  policy_mae=0.11055  hold_state_mae=0.11957  (140s)
+[tidy_up_stationery_le/batch_3] 3638 anchors  policy_mae=0.11447  hold_state_mae=0.13035  (469s)
+[tidy_up_stationery_le/batch_4] 1858 anchors  policy_mae=0.08108  hold_state_mae=0.10979  (240s)
+
+policy      MAE 0.11371
+hold_state  MAE 0.11781
+train_mean  MAE 0.30894
+-> written to patch_heldout.json
