@@ -35,6 +35,12 @@ def main() -> None:
     p.add_argument("--joints", type=int, nargs="*", default=None, help="default: all")
     p.add_argument("--fps", type=float, default=30.0)
     p.add_argument("--no-null", action="store_true", help="hide the hold_state baseline")
+    p.add_argument("--mode", choices=("fan", "executed"), default="fan",
+                   help="fan: every anchor's whole chunk (default). executed: only the slice each "
+                        "chunk actually contributes at n_action_steps, i.e. the single per-tick "
+                        "curve the robot would follow -- what select_action returns.")
+    p.add_argument("--n-action-steps", type=int, default=None,
+                   help="executed mode only; default = chunk length (fully open loop)")
     p.add_argument("--out", type=Path, required=True)
     args = p.parse_args()
 
@@ -48,6 +54,16 @@ def main() -> None:
     pred, gt, state = d["pred"][sel], d["gt"][sel], d["state"][sel]
     valid, frame0 = d["valid"][sel], d["frame_index"][sel]
     joints = args.joints if args.joints else range(pred.shape[2])
+
+    # In `executed` mode the policy is only re-queried every n_action_steps ticks, so most
+    # anchors are never actually consulted on the robot. Keep the ones that would be, and
+    # clip each to the slice it contributes; the concatenation is the per-tick action curve.
+    n_exec = args.n_action_steps or pred.shape[1]
+    if args.mode == "executed":
+        step = max(1, round(n_exec / max(1, int(frame0[1] - frame0[0])))) if len(frame0) > 1 else 1
+        keep = np.arange(0, len(pred), step)
+        pred, gt, state, valid, frame0 = (x[keep] for x in (pred, gt, state, valid, frame0))
+        valid = valid & (np.arange(valid.shape[1]) < n_exec)
 
     # Ground truth is reassembled from the anchors' own targets: anchor a covers frames
     # frame0[a] .. frame0[a]+H-1, and with stride < H those windows overlap and agree, so the
@@ -65,8 +81,11 @@ def main() -> None:
         for a in range(len(pred)):
             h = np.flatnonzero(valid[a])
             t = (frame0[a] + h) / args.fps
-            ax.plot(t, pred[a, h, j], color="crimson", lw=1.0, alpha=0.55, zorder=2,
-                    label="predicted chunk" if (a == 0 and j == joints[0]) else None)
+            ax.plot(t, pred[a, h, j], color="crimson",
+                    lw=1.3 if args.mode == "executed" else 1.0,
+                    alpha=0.9 if args.mode == "executed" else 0.55, zorder=2,
+                    label=("executed action" if args.mode == "executed" else "predicted chunk")
+                    if (a == 0 and j == joints[0]) else None)
             if not args.no_null:
                 ax.plot(t, np.full(len(h), state[a, j]), color="tab:blue", lw=0.9, ls="--", alpha=0.4,
                         zorder=1, label="hold_state (null)" if (a == 0 and j == joints[0]) else None)
@@ -76,7 +95,9 @@ def main() -> None:
 
     axes[-1, 0].set_xlabel("episode time (s)")
     fig.legend(loc="upper right", frameon=False, fontsize=9)
-    fig.suptitle(f"{str(d['repo_id'])} - episode {ep}: open-loop chunk predictions vs. demonstration")
+    what = ("per-tick executed action" if args.mode == "executed"
+            else "open-loop chunk predictions")
+    fig.suptitle(f"{str(d['repo_id'])} - episode {ep}: {what} vs. demonstration")
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out, dpi=150)

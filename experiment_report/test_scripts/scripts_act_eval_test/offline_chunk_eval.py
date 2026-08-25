@@ -214,6 +214,9 @@ def evaluate(
     max_anchors_per_dataset: int | None,
     train_root: Path | None,
     invert_filter: bool = False,
+    dump_traces: Path | None = None,
+    trace_anchors: int = 40,
+    trace_episodes: set[int] | None = None,
 ) -> dict:
     from lerobot.utils.constants import ACTION, OBS_STATE
 
@@ -232,6 +235,12 @@ def evaluate(
     n_joints = None
     joint_names = None
     t_start = time.time()
+    # Raw per-anchor predictions, kept only for the first scored dataset and only for the
+    # first `trace_anchors` anchors (or only for the requested `trace_episodes`): the
+    # accumulator above is streaming by design, so the arrays a trajectory plot needs do
+    # not otherwise survive the loop.
+    traces: dict[str, list] | None = {} if dump_traces else None
+    traces_n = 0
 
     for root in dataset_roots:
         repo_id = f"{root.parent.name}/{root.name}"
@@ -284,6 +293,37 @@ def evaluate(
             acc["train_mean"].update(
                 a_mean.view(1, 1, -1).expand_as(gt), gt, valid
             )
+
+            if traces is not None and traces_n < trace_anchors:
+                if trace_episodes is not None:
+                    keep = torch.isin(
+                        batch["episode_index"].cpu(), torch.tensor(sorted(trace_episodes))
+                    )
+                    n_keep = int(keep.sum())
+                else:
+                    keep, n_keep = None, len(gt)
+                if n_keep:
+                    for key, val in (
+                        ("pred", pred), ("gt", gt), ("state", state), ("valid", valid),
+                        ("episode_index", batch["episode_index"]), ("frame_index", batch["frame_index"]),
+                    ):
+                        arr = val.cpu().numpy()
+                        traces.setdefault(key, []).append(
+                            arr[keep.numpy()] if keep is not None else arr
+                        )
+                    traces_n += n_keep
+
+        if traces:
+            import numpy as np
+            dump_traces.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                dump_traces,
+                joint_names=np.array(joint_names),
+                repo_id=repo_id,
+                **{k: np.concatenate(v)[:trace_anchors] for k, v in traces.items()},
+            )
+            print(f"wrote {dump_traces}  ({traces_n} anchors from {repo_id})", flush=True)
+            traces = None
 
         for k in overall:
             overall[k].abs_sum += acc[k].abs_sum
@@ -385,12 +425,34 @@ def main() -> None:
     p.add_argument("--keep-only-contaminated", action="store_true",
                    help="invert --train-root: score ONLY episodes that ARE in the\ntraining set (within-session control)")
     p.add_argument("--out", type=Path)
+    p.add_argument("--dump-traces", type=Path, default=None,
+                   help="save raw per-anchor pred/gt/state for the first scored dataset to an .npz, "
+                        "for plot_traces.py")
+    p.add_argument("--trace-anchors", type=int, default=200,
+                   help="max anchors to keep in the trace dump (default 40)")
+    p.add_argument("--trace-episode", type=int, action="append", default=[],
+                   help="only dump anchors from this episode index (repeatable). Without it the "
+                        "first --trace-anchors anchors of the dataset are kept, which with "
+                        "stride>1 all come from the first episode -- pass --trace-episode N "
+                        "(and raise --trace-anchors if N's episode has more anchors) to plot "
+                        "a specific episode")
     p.add_argument("--selftest", action="store_true")
     args = p.parse_args()
 
     if args.selftest:
         selftest()
         return
+    # --checkpoint is the pretrained_model/ dir, not the job dir. Getting this wrong throws
+    # a draccus ParsingError from deep inside config decoding, which says nothing useful.
+    if args.checkpoint and not (args.checkpoint / "config.json").is_file():
+        found = sorted(args.checkpoint.glob("run/checkpoints/*/pretrained_model"))
+        hint = f"\n  did you mean:  --checkpoint {found[-1]}" if found else ""
+        p.error(f"no config.json in {args.checkpoint} -- point --checkpoint at a "
+                f"pretrained_model/ directory.{hint}")
+    if args.dump_traces and args.dump_traces.is_dir():
+        p.error(f"--dump-traces must be a file path, not a directory; "
+                f"try {args.dump_traces / 'traces.npz'}")
+
     if not args.checkpoint or not args.dataset_root:
         p.error("--checkpoint and at least one --dataset-root are required")
 
@@ -405,6 +467,9 @@ def main() -> None:
         max_anchors_per_dataset=args.max_anchors_per_dataset,
         train_root=args.train_root,
         invert_filter=args.keep_only_contaminated,
+        dump_traces=args.dump_traces,
+        trace_anchors=args.trace_anchors,
+        trace_episodes=set(args.trace_episode) or None,
     )
     agg = report["aggregate"]
     print("\n=== aggregate over all held-out datasets ===")
