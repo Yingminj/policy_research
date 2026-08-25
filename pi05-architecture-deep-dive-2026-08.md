@@ -30,7 +30,8 @@
 但你的 finetune 过程本身退化成了纯 flow matching 回归。** 论文里的「co-training / 知识隔离 /
 分层推理」这三件事，代码里一件都没有。这不是 bug，是 openpi 的发布范围。
 
-后文 §1–§8 讲代码里**真实存在**的那条计算路径；§9 讲论文里有、代码里没有的部分；§10 讲这个 fork 自己的坑。
+后文 §1–§8 讲代码里**真实存在**的那条计算路径；§9 讲论文里有、代码里没有的部分；§10 讲这个 fork 自己的坑；
+§11–§12 是训练实务：一个真实训练脚本的逐项拆解，以及「反向传播时参数到底动多少」的定量计算。
 
 ---
 
@@ -835,7 +836,311 @@ $$\mathcal{L}_{\text{real}} \approx \frac{32}{D}\Big(\mathcal{L} - \frac{32-D}{3
 
 ---
 
-## 11. 形状速查表
+## 11. 训练实务：一个真实脚本的逐项拆解
+
+以 `train_sh/run_pi05_tj_clothes_400.sh` + config `pi05_yw_tidy_up`（`config.py:1812-1847`）为例。
+
+### 11.1 它是 README 的哪一步
+
+**是第 2 步「Defining training configs and running training」的后半段**：
+
+```bash
+/root/.local/bin/uv run --no-sync scripts/train.py "${CONFIG_NAME}" --exp-name="${EXPERIMENT_NAME}"
+```
+
+对应 README:161 的 `uv run scripts/train.py pi05_libero --exp-name=my_experiment`，
+`XLA_PYTHON_CLIENT_MEM_FRACTION=0.9` 也一致。但有三处和字面不符：
+
+| | 情况 |
+|---|---|
+| **norm stats 不在里面** | README 要求先跑 `compute_norm_stats.py`。这里拆到了同目录的 `prepare_tidy_up.sh`（用 `compute_norm_stats_low_mem.py --direct-lerobot --direct-chunk-size 1024`）。**必须先跑那个**。 |
+| **跑的不是本仓库** | `PROJECT_ROOT=/ssd/hhw/openpi-hzh`，`cd` 过去再执行。真正生效的 `pi05_yw_tidy_up` 是**那个 checkout 里的**。两边漂移时，你读的和跑的不是一份代码。 |
+| **文件名对不上内容** | 文件名 `run_pi05_tj_clothes_400.sh`，但 `CONFIG_NAME=pi05_yw_tidy_up`、数据集是 `tidy_up_stationery_le`。和 `pi05_hhw_tj_clothes_400_uniform`（`config.py:1782`）没有关系。 |
+
+另外没传 `--overwrite` / `--resume`，checkpoint 目录已存在时会直接报错（`TrainConfig.__post_init__` 之后的目录检查）。
+
+### 11.2 这是全量微调，证据链
+
+- `freeze_filter` **未设置** → 默认 `nnx.Nothing`（`config.py:762`）
+- `trainable_filter = nnx.All(nnx.Param, nnx.Not(nnx.Nothing))` = **全部参数**（`config.py:819-821`）
+- `model=Pi0Config(pi05=True)`，两个 variant 都是普通 `gemma_2b` / `gemma_300m`，**无 lora**
+
+训练的部分 = 全部 ≈3.35B：
+
+| 模块 | 参数量 | 状态 |
+|---|---|---|
+| SigLIP So400m/14 视觉塔 | ~414M | 训练 |
+| Gemma 2B（expert 0，含 257152×2048 embedder） | ~2.51B | 训练 |
+| Action expert 300M + adaRMS 调制层 | ~427M | 训练 |
+| `action_in_proj` / `action_out_proj` / `time_mlp_in` / `time_mlp_out` | ~2M | 训练 |
+
+外加一份 EMA 副本：`ema_decay` 未设 → 默认 **0.99**（`config.py:759`），有效窗口仅 100 步
+（对比 `pi05_libero` 的 0.999 / 1000 步）。
+
+### 11.3 没有「微调顺序」
+
+**单阶段、单损失、所有参数从第 1 步起同时更新。** 唯一的「顺序」是两件事：
+
+1. **权重血统**：`pi05_base`（PI 用 knowledge insulation 训出来的）→ `CheckpointWeightLoader` 全量加载 → 本次微调。就一跳。
+2. **学习率日程**：warmup 2000 步 → 余弦退火，见 §12.3。
+
+损失只有 flow matching L2 一项 —— 没有交叉熵、没有 stop-gradient、没有分层预测（§9）。
+所以 VLM 主干在这 150k 步里**没有任何语言监督拉着它**。150k × batch 12 是很长的暴露时间，
+这是该配置最值得担心的地方（定量见 §12.3 的累计位移预算）。
+
+### 11.4 显存账：`fsdp_devices=1` 是个隐患
+
+脚本没传 `--fsdp-devices`，默认 `fsdp_devices=1`（`config.py:804`）= **纯数据并行，每张卡各存一份完整副本**。
+参数是 fp32（`init_train_state` 只把 `freeze_filter` 命中的参数转 bf16，全量微调时没有命中项，
+`train.py:104-105`）：
+
+```
+params 13.4GB + Adam m,v 26.8GB + EMA 13.4GB ≈ 53.6GB   （还没算梯度 13.4GB 和激活）
+```
+
+4×80GB 也很紧。OOM 时第一件事是加 `--fsdp-devices 4`，而不是降 batch（batch 已经只有 12，见 §12.5）。
+
+顺带一个过时注释：config 里写 "Global batch 12 across six devices gives a per-device batch of 2"，
+但脚本给的是 `CUDA_VISIBLE_DEVICES=0,1,2,3` **四张卡** → 实际 per-device 是 **3**。
+`12 % 4 == 0` 所以不会触发 `train.py:198` 的整除检查，只是注释没跟上。
+
+### 11.5 改成 LoRA 怎么做
+
+**可以，JAX 路径支持，仓库里已有现成模板**：`pi05_hhw_tj_fangkuai_lora`（`config.py:1670-1712`）。
+在 `pi05_yw_tidy_up` 基础上改四处：
+
+```python
+model=pi0_config.Pi0Config(
+    pi05=True,
+    paligemma_variant="gemma_2b_lora",        # rank 16, alpha 16 (attn + ffn)
+    action_expert_variant="gemma_300m_lora",  # rank 32, alpha 32 (attn + ffn)
+),
+freeze_filter=pi0_config.Pi0Config(
+    pi05=True,
+    paligemma_variant="gemma_2b_lora",
+    action_expert_variant="gemma_300m_lora",
+).get_freeze_filter(),
+ema_decay=None,                                # LoRA 关掉 EMA
+lr_schedule=_optimizer.CosineDecaySchedule(
+    warmup_steps=2_000, peak_lr=2.0e-4,        # 比全量高一个数量级
+    decay_steps=150_000, decay_lr=1.0e-5,
+),
+```
+
+**一个反直觉的坑**：`get_freeze_filter`（`pi0_config.py:96-118`）返回的是
+
+```python
+nnx.All(PathRegex(".*llm.*"), nnx.Not(PathRegex(".*lora.*")))
+```
+
+**只匹配 `llm`**。所以 LoRA 模式下这些**仍然全量训练**：
+
+- **SigLIP 视觉塔 ~414M 全量**（路径是 `PaliGemma/img/...`，不含 `llm`）
+- `action_in_proj` / `action_out_proj` / `time_mlp_in` / `time_mlp_out`
+- 全部 LoRA A/B（`lora.py:51-52` 命名为 `lora_a` / `lora_b`，被 `.*lora.*` 排除出冻结集）
+
+被冻的是 llm 里的非 LoRA 权重，**含 adaRMS 的 `Dense` 调制层**（它们在 `llm/layers/.../pre_attention_norm_1/` 下）。
+冻结部分会被转成 **bf16**（`train.py:105`），这才是 LoRA 省显存的主要来源 —— 不只是优化器状态变小。
+
+想连视觉塔一起省，得自己在 freeze_filter 上再 `nnx.Or` 一个 `PathRegex(".*img.*")`，`get_freeze_filter` 不管这块。
+
+其他注意事项：
+- **PyTorch 路径不支持 LoRA**（README:192-198），必须走 `scripts/train.py`（JAX）。
+- norm stats 不受影响，可直接复用。
+- 换 `exp_name`，否则和全量微调的 checkpoint 目录撞车。
+
+---
+
+## 12. 反向传播时参数到底动多少
+
+「所有参数同时更新」不等于「所有参数动得一样多」，也不等于「动多少由梯度大小决定」。
+这一节把更新量算清楚。代码在 `scripts/train.py:137-190`。
+
+### 12.1 一步的四段链路
+
+**步 0 — 只对可训练参数求梯度**
+
+```python
+diff_state = nnx.DiffState(0, config.trainable_filter)
+loss, grads = nnx.value_and_grad(loss_fn, argnums=diff_state)(model, train_rng, observation, actions)
+```
+
+LoRA 时被 `freeze_filter` 命中的参数**根本不进反向图**（不是算完再丢）。
+
+**步 1 — 全局梯度裁剪**（`optax.clip_by_global_norm(1.0)`）
+
+$$\|g\|_2 = \sqrt{\sum_{\text{所有可训练参数}}\ \sum_{\text{每个元素}} g_i^2},\qquad
+\tilde{g} = g\cdot\frac{c}{\max(c,\ \|g\|_2)},\quad c=1.0$$
+
+**这是「所有参数同时更新」唯一真正的耦合点**：SigLIP、Gemma 2B、action expert 的梯度
+全在**同一个标量范数**里。任何一个模块出尖峰，整个模型这一步都被同比例缩小。
+
+**步 2 — AdamW**
+
+$$
+\begin{aligned}
+m_t &= \beta_1 m_{t-1} + (1-\beta_1)\,\tilde{g}_t, &\beta_1 &= 0.9\\
+v_t &= \beta_2 v_{t-1} + (1-\beta_2)\,\tilde{g}_t^{\,2}, &\beta_2 &= 0.95\\
+\hat{m}_t &= \frac{m_t}{1-\beta_1^t},\qquad \hat{v}_t = \frac{v_t}{1-\beta_2^t}\\[4pt]
+\Delta\theta_t &= -\,\eta_t\left(\frac{\hat{m}_t}{\sqrt{\hat{v}_t}+\varepsilon} + \lambda\,\theta_t\right),
+&\varepsilon &= 10^{-8},\ \lambda = 10^{-10}
+\end{aligned}
+$$
+
+**步 3 — 应用 + EMA**
+
+$$\theta_{t+1} = \theta_t + \Delta\theta_t,\qquad
+\theta^{\text{EMA}}_{t+1} = \lambda_{\text{ema}}\,\theta^{\text{EMA}}_t + (1-\lambda_{\text{ema}})\,\theta_{t+1}$$
+
+注意 `train.py:172-174` 是对 `new_params`（**完整** state）做 EMA，包括冻结参数 ——
+冻结的那些每步在和自己平均，结果不变。
+
+### 12.2 关键结论：更新量 ≈ 学习率，与梯度大小无关
+
+看 $\hat{m}/(\sqrt{\hat{v}}+\varepsilon)$ 这一项：$\hat m$ 是梯度滑动均值，$\sqrt{\hat v}$ 是梯度滑动 RMS，
+**两者量纲相同**，所以比值**无量纲、量级恒为 $O(1)$**，上界约 1。
+
+$$\big|\Delta\theta_i\big| \lesssim \eta_t \qquad\text{（逐元素，与 } g_i \text{ 的绝对大小无关）}$$
+
+极端情况最清楚：**第 1 步**（$t=1$）时 $\hat m_1 = \tilde g_1$、$\hat v_1 = \tilde g_1^2$，于是
+
+$$\frac{\hat m_1}{\sqrt{\hat v_1}} = \operatorname{sign}(\tilde g_1)$$
+
+**第一步就是纯 sign-SGD × 学习率**。梯度是 $10^{-3}$ 还是 $10^{-9}$，位移都是 $\eta_1$。
+
+所以「3.35B 个参数同时更新」**不代表某些模块被更新得更猛** —— AdamW 把每个元素的步长
+都归一化到了 $\eta_t$ 这个尺度。真正决定各模块动多快的是**梯度方向的一致性**：
+
+$$\frac{|\hat m|}{\sqrt{\hat v}} \approx \begin{cases}
+\approx 1 & \text{梯度方向稳定（真信号）} \Rightarrow \text{每步走满 } \eta_t\\
+\ll 1 & \text{梯度在正负间抖动（噪声）} \Rightarrow \text{原地随机游走}
+\end{cases}$$
+
+### 12.3 代进 `pi05_yw_tidy_up` 的数字
+
+$\eta_{\text{peak}}=2.5\times10^{-5}$，warmup 2000，cosine 到 $10^{-6}$，`decay_steps=num_train_steps=150{,}000`。
+
+**学习率日程**（`optax.warmup_cosine_decay_schedule`，`optimizer.py:24-30`）：
+
+$$\eta_t = \begin{cases}
+\dfrac{2.5\times10^{-5}}{2001} + t\cdot\dfrac{2.5\times10^{-5} - 1.25\times10^{-8}}{2000} & t \le 2000\\[10pt]
+10^{-6} + \dfrac{2.5\times10^{-5}-10^{-6}}{2}\left(1+\cos\dfrac{\pi(t-2000)}{148000}\right) & t > 2000
+\end{cases}$$
+
+起点 $1.25\times10^{-8}$（`peak_lr/(warmup_steps+1)`），cosine 段恰好 148k 步，
+第 150k 步落到 $10^{-6}$ —— **这个配置的余弦是真的走完的**，
+不像 `pi05_libero` 那个 `decay_steps=1M ≫ num_train_steps=30k` 退化成恒定 lr 的写法（§7.2）。
+
+**单步绝对位移**：峰值时每个元素最多动 $2.5\times10^{-5}$。
+
+**相对位移**才有意义。Gemma 2B 的 `q_einsum` 用 `lecun_normal`，fan_in = 2048：
+
+$$\sigma_\theta \approx \frac{1}{\sqrt{2048}} \approx 0.022
+\quad\Rightarrow\quad
+\frac{|\Delta\theta|}{\sigma_\theta} \approx \frac{2.5\times10^{-5}}{0.022} \approx 1.1\times10^{-3}$$
+
+**一步动典型权重的约 0.1%。** Action expert（fan_in 1024，$\sigma\approx0.031$）相对更新还要小 ~30%。
+
+**150k 步的累计上界**（假设梯度符号从不翻转，实际远小于此）：
+
+$$\sum_t \eta_t \approx \bar\eta \cdot 148000 \approx 1.3\times10^{-5}\times1.48\times10^5 \approx 1.9$$
+
+即每个元素理论上最多漂移 1.9 —— 是典型权重尺度 0.022 的 **86 倍**。
+**这就是 §11.3 那句担心的定量版本**：150k 步全量微调 + 零语言监督，预算完全够把 VLM 主干
+拖离预训练分布，只差梯度方向一致。
+
+**weight decay 项**：$\eta_t\lambda\theta = 2.5\times10^{-5}\times10^{-10}\times0.022 \approx 5\times10^{-17}$。
+彻底是 0，证实了 `optimizer.py:71` 那句注释 —— 设成 `1e-10` 只是为了绕开 optax 的 OOM。
+
+### 12.4 全局裁剪什么时候真的起作用
+
+裁剪在 Adam **之前**。如果 $\|g\|$ **持续**大于 1，所有梯度被同一个常数因子 $c/\|g\|$ 缩放，
+而 Adam 对全局常数因子是**不变的**（分子分母同时缩放）：
+
+$$\frac{\alpha\hat m}{\sqrt{\alpha^2\hat v}+\varepsilon} \approx \frac{\hat m}{\sqrt{\hat v}}$$
+
+所以**持续裁剪几乎没有效果**。裁剪真正救命的是**间歇性尖峰**：某一步 $\|g\|$ 暴涨 100 倍被压回 1，
+而 $\hat v$ 还停留在旧尺度上，这一步就不会把参数轰飞。
+
+### 12.5 梯度不是在「所有数据」上算的
+
+这是最容易误解的一点。**这是 mini-batch SGD，不是 full-batch**：
+
+```python
+data_loader = create_data_loader(config, sharding=data_sharding, shuffle=True)   # train.py:220-224
+batch = next(data_iter)                                                          # 12 个样本
+```
+
+`num_batches` 未传 → `None` → 数据集**无限循环**、每 epoch 重新 shuffle，训练在
+`num_train_steps=150_000` 步停。**没有梯度累积**（`train_step` 一次 `value_and_grad` 直接接一次 `tx.update`）。
+
+$$g_t = \nabla_\theta\ \frac{1}{12}\sum_{i=1}^{12}\ell(\theta;\ \xi_i^{(t)})\ \ \neq\ \ \nabla_\theta\ \frac{1}{N}\sum_{i=1}^{N}\ell(\theta;\ \xi_i)$$
+
+$g_t$ 是真实梯度的**无偏但高方差的蒙特卡洛估计**。
+
+**而且噪声比普通 mini-batch 还大 —— 四重随机**。同一帧数据两次被抽到时，训练信号完全不同：
+
+| 随机源 | 位置 | 影响 |
+|---|---|---|
+| 1. 抽哪 12 帧 | `shuffle=True` | 普通 SGD 噪声 |
+| 2. 时间 $t\sim0.999\,\mathrm{Beta}(1.5,1)+0.001$ | `pi0.py:205` | 每样本独立，决定看到的噪声水平 |
+| 3. 噪声 $\epsilon\sim\mathcal N(0,I)$，`[12,50,32]` | `pi0.py:204` | **回归目标 $u=\epsilon-a$ 本身被 $\epsilon$ 主导**（归一化后方差为 1） |
+| 4. 图像增强（RandomCrop / Rotate / ColorJitter） | `model.py:167-186` | 每样本独立 |
+
+第 3 点最关键：模型要拟合的不是确定标签，而是 $\mathbb{E}[\epsilon - a \mid x_t, o, t]$，
+单样本只给出这个条件期望的**一次抽样**。这也是 §6.3 那个 loss 地板的来源 —— 它就是不可约的采样方差。
+
+150k × 12 = **1.8M 次样本抽取**，但因为 $(t,\epsilon,\text{aug})$ 每次重抽，
+**没有任何一个样本被以相同方式看过两次**。epoch 数 $= 1.8\times10^6 / N_{\text{frames}}$。
+
+### 12.6 两点串起来的后果：batch 12 是这个配置的真问题
+
+§12.2 说更新量 $\approx\eta_t$ 与梯度大小无关；§12.5 说梯度噪声极大。合起来看，
+$\hat m/\sqrt{\hat v}$ 会被压得很小：
+
+$$\frac{|\hat m|}{\sqrt{\hat v}}\ \sim\ \frac{|\text{信号}|}{\sqrt{|\text{信号}|^2+\sigma_{\text{noise}}^2}}\ \ll 1
+\quad\text{当噪声占优}$$
+
+即**实际每步走的远不到 $2.5\times10^{-5}$**，靠 150k 步的长时间平均把信号从噪声里积出来。
+这就是为什么这个配置要跑 150k 步，而 `pi05_libero`（batch **256**）只要 30k 步 ——
+差 21 倍的 batch，用 5 倍的步数补，并不划算。
+
+$\beta_2=0.95$（而非 0.999）在这里也偏激进：$\hat v$ 的有效窗口只有约 20 步 × 12 样本 = 240 个样本的
+梯度二阶矩，估计本身就抖。**batch 12 + $\beta_2=0.95$ 是这个配置里最值得调的一对参数，比 lr 更值得调。**
+
+### 12.7 唯一真正「在所有数据上算」的东西
+
+`prepare_tidy_up.sh` 跑的 norm stats：
+
+```bash
+compute_norm_stats_low_mem.py --config-name pi05_yw_tidy_up --direct-lerobot --direct-chunk-size 1024
+```
+
+$q_{01}, q_{99}, \mu, \sigma$ 是**遍历整个数据集**统计出来的，训练全程固定不变。
+它们决定归一化区间（§2.1）和 256 分箱的量程（§2.2）—— 全流程里唯一的全局量。
+这也是 CLAUDE.md 里「loss 发散通常是 norm stats 有问题」的原因：它错了，1.8M 次采样每一次都错。
+
+### 12.8 怎么观测
+
+`train.py:178-190` 已经把两个量记进 `info`：
+
+```python
+"grad_norm":  optax.global_norm(grads),        # 裁剪【前】的原始梯度范数
+"param_norm": optax.global_norm(kernel_params) # 只统计 ndim>1 的 kernel，
+                                               # 排除 bias/scale/pos_embedding/input_embedding
+```
+
+判读：
+
+| 观察 | 含义 |
+|---|---|
+| `grad_norm` 长期 $\gg 1$ | 裁剪常态化 → 按 §12.4 等于几乎没生效，说明 lr 或 batch 需要重调 |
+| `grad_norm` 偶发尖峰 | 裁剪在正常工作，符合预期 |
+| `param_norm` 单调上涨 | 参数在系统性漂移，配合 loss 一起看（结合 §12.3 的 1.9 位移预算判断严重程度） |
+
+---
+
+## 13. 形状速查表
 
 以 `pi05`、`action_dim=32`、`action_horizon=50`、`max_token_len=200`、三相机 224×224、batch $B$ 为例。
 
@@ -862,7 +1167,7 @@ $$\mathcal{L}_{\text{real}} \approx \frac{32}{D}\Big(\mathcal{L} - \frac{32-D}{3
 
 ---
 
-## 12. 一页纸总结
+## 14. 一页纸总结
 
 **π₀.₅ 相对 π₀ 的模型改动只有两条**（`pi0_config.py:32-35` 的注释就是这么写的）：
 
@@ -878,6 +1183,16 @@ SigLIP So400m/14 视觉塔、分块注意力（VLM 不看动作 token）、
 你在这个仓库里做的，是「用 flow matching 回归 finetune 一个 KI 预训练过的 3.35B checkpoint」。
 
 把这句话记住，就不会再对着 loss 曲线困惑为什么模型的语言泛化在训练中越来越差。
+
+**训练侧再补三句**（§11–§12 的浓缩）：
+
+1. **默认 = 全量微调。** `freeze_filter` 不设就是 `nnx.Nothing`，3.35B 参数一个不冻、单阶段、
+   从第 1 步起同时更新。没有「先训哪块再训哪块」这回事。
+2. **更新量由学习率决定，不由梯度大小决定。** AdamW 的 $\hat m/\sqrt{\hat v}$ 无量纲且 $O(1)$，
+   每个元素每步位移 $\lesssim\eta_t$；第 1 步严格等于 sign-SGD $\times\eta_1$。
+   模块之间的差异来自**梯度方向的一致性**，不是梯度的绝对大小。
+3. **梯度是 12 个样本 + 四重随机的蒙特卡洛估计，不是全数据梯度。** 全流程里唯一在整个数据集上
+   算出来的量是 norm stats。想加速收敛，先加 batch，再谈 lr。
 
 ---
 
@@ -907,3 +1222,16 @@ SigLIP So400m/14 视觉塔、分块注意力（VLM 不看动作 token）、
 | 优化器 / 调度 | `src/openpi/training/optimizer.py:17, 66` |
 | loss 归约 + EMA | `scripts/train.py:150, 169` |
 | PyTorch 镜像实现 | `src/openpi/models_pytorch/pi0_pytorch.py:84` |
+| **训练实务（§11–§12）** | |
+| `train_step`（梯度→裁剪→AdamW→EMA） | `scripts/train.py:137` |
+| 冻结参数转 bf16 | `scripts/train.py:104` |
+| `grad_norm` / `param_norm` 上报 | `scripts/train.py:178` |
+| batch 整除设备数检查 | `scripts/train.py:198` |
+| data loader 创建（`shuffle=True`，无限循环） | `scripts/train.py:220` |
+| `trainable_filter` / `freeze_filter` 默认值 | `src/openpi/training/config.py:762, 819` |
+| `fsdp_devices` 默认 1 | `src/openpi/training/config.py:804` |
+| LoRA freeze filter（只匹配 `.*llm.*`） | `src/openpi/models/pi0_config.py:96` |
+| LoRA 参数命名 `lora_a` / `lora_b` | `src/openpi/models/lora.py:51` |
+| pi05 LoRA 配置模板 | `src/openpi/training/config.py:1670` |
+| 本例配置 `pi05_yw_tidy_up` | `src/openpi/training/config.py:1812` |
+| 训练/准备脚本 | `train_sh/run_pi05_tj_clothes_400.sh`, `train_sh/prepare_tidy_up.sh` |
