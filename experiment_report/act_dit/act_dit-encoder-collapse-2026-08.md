@@ -8,6 +8,10 @@
 **脚本** `../test_scripts/scripts_act_dit_probe/`（`probe_encoder_collapse.py` / `probe_conditioning.py` / `train_ablation.py` / `sweep_sampling.py`）
 **补丁** `act_dit-state-in-adaln.patch`
 
+> **后续（2026-08-27）**：§1 的处方（LR 降回 1e-5）已在 08-24 那次训练里执行并验证有效——
+> 编码器没有塌，图像敏感度回到 2.2e-2。但那次同时把 objective 换成了 diffusion，离线动作精度
+> 反而全线变差。见 [`act_dit-lowlr-diffusion-2026-08.md`](act_dit-lowlr-diffusion-2026-08.md)。
+
 ---
 
 ## 1. 结论
@@ -175,8 +179,13 @@ ACT baseline 编码器是健康的（img-sens 0.05、γ=1.004），但它在 hel
 
 **本表的边界**：8000 步时三个 arm 的 `gamma_last` 分别是 0.962 / 0.973 / 0.996，都还接近初始值；
 而真实 checkpoint 在 50k 步时已经是 0.488。也就是说 **γ 的塌缩发生在 8k–50k 之间，本次消融
-只看到了衰减的起点，没有看到终点。** "`lowlr` 是避免还是仅仅推迟"这个问题，需要一次 50k 步的
+只看到了衰减的起点，没有看到终点。** "`lowlr` 是避免还是仅仅推迟"这个问题，需要一次更长的
 复现才能回答。
+
+> **后续（2026-08-27）已回答：是避免，至少到 200k 步。** 08-24 那次 lr 1e-5 的全长训练在
+> 200k 步时 `gamma_last` = 0.973、`frac<0.05` 全程为 0，img-sens 2.2e-2（塌掉那版是 3e-6）。
+> 但 enc3 的输出幅值在同一段里仍降了 25%（0.691 → 0.516）——**衰减机制没有被消灭，只是被减速到
+> 200k 步内无害**。见 [`act_dit-lowlr-diffusion-2026-08.md`](act_dit-lowlr-diffusion-2026-08.md) §2。
 
 ---
 
@@ -288,7 +297,20 @@ encoder 依然完好，是已经验证过的配方。代价是收敛慢 3.5×（
 **P1 — 把 state 从 adaLN 拿掉。** 补丁见 `act_dit-state-in-adaln.patch`：给 `ACTDiTConfig`
 加一个 `state_in_adaln: bool = False`，adaLN 只带 flow timestep，state 回到 encoder token
 这条 ACT 原有的路。改动 16 行、2 个文件，相同 loss 下图像敏感度高 3–6×，收敛速度几乎不变。
-和 P0 是独立的两件事，应该一起做。
+
+> **2026-08-27 降级：不要和 P0 一起做，留作下一轮的第二个 arm。** 理由有二。其一，P0 单独就
+> 够用了：lr 1e-5 训到 200k 步 encoder 完好（上面 §4.3 的后续），而本次消融里
+> `no_state_adaln` 从来只是把衰减减速 3–6×、没有阻止过。其二，下一次重训是
+> flow matching + 1e-5 + EMA，是四种组合里唯一缺的那格，再叠一个 `state_in_adaln=False`
+> 就又成了两变量实验。
+>
+> 但这条问题**没有消失**：08-24 那次的归因表里 adaLN 那条 state 通路仍占 36.6%，压过图像的
+> 27.1%，而 ACT 原有的 encoder token 通路只有 2.8%——解码器还是主要从 adaLN 拿 state；
+> img-sens 2.2e-2 也仍比 ACT baseline 的 5.0e-2 低 2.3 倍。
+>
+> **判据**：fm + 1e-5 那次训完之后跑两个探针，若 enc3 signal 在 200k 内仍掉 20% 以上，或
+> adaLN 份额仍高于图像份额，就把这个补丁作为 A/B 的第二个 arm 跑掉。训练预算一旦超过
+> 200k 步，直接打。
 
 ```bash
 cd /home/kewei/YING/robot_data_platform/lerobot

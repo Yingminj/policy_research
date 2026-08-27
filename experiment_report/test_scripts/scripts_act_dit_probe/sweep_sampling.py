@@ -5,9 +5,10 @@
 things follow that plain ACT does not have, and both are visible in the offline numbers as
 an error floor that does not shrink with the horizon:
 
-  * the sample is only as accurate as the integrator.  `num_integration_steps` defaults to
-    10 Euler steps, and the beta timestep schedule spends ~3% of training in t > 0.9 -- the
-    low-noise end where the trajectory is actually refined.
+  * the sample is only as accurate as the integrator.  `--steps` sweeps
+    `num_integration_steps` (flow matching, 10 Euler steps by default) or
+    `num_inference_steps` (diffusion, 10 DDIM steps by default), whichever objective the
+    checkpoint was trained with.
   * the sample is *stochastic*.  A different noise draw gives a different chunk, and at the
     first action of the chunk -- the one the robot executes immediately -- that variance is
     pure error, because the correct first action is nearly determined by the current pose.
@@ -69,11 +70,20 @@ def sweep(checkpoint: Path, dataset_roots: list[Path], train_root: Path | None,
 
             def patched(ck, dev, _s=n_steps, _n=n_samples):
                 policy, pre, post, cfg = base_load(ck, dev)
-                cfg.num_integration_steps = _s
-                policy.config.num_integration_steps = _s
-                # The objective reads the value off the config it was handed at construction,
-                # which is the same object -- but assert it rather than assume it.
-                assert policy.objective.config.num_integration_steps == _s
+                if cfg.objective == "flow_matching":
+                    cfg.num_integration_steps = _s
+                    policy.config.num_integration_steps = _s
+                    # The objective reads the value off the config it was handed at
+                    # construction, which is the same object -- but assert it rather
+                    # than assume it.
+                    assert policy.objective.config.num_integration_steps == _s
+                else:
+                    # `DiffusionObjective` resolves `num_inference_steps` once in its
+                    # __init__ and caches it on itself, so the config alone is not enough.
+                    cfg.num_inference_steps = _s
+                    policy.config.num_inference_steps = _s
+                    policy.objective.num_inference_steps = _s
+                    assert policy.objective.num_inference_steps == _s
                 if _n > 1:
                     policy.predict_action_chunk = averaged_chunk(policy, _n)
                 return policy, pre, post, cfg

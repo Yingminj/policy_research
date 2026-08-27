@@ -65,6 +65,50 @@ def euler_sample(model, x0: torch.Tensor, cond, n_steps: int) -> torch.Tensor:
     return x
 
 
+def ddim_sample(objective, model, x0: torch.Tensor, cond) -> torch.Tensor:
+    """`DiffusionObjective.conditional_sample` with the initial noise supplied.
+
+    Same reason as `euler_sample`: the objective draws its own `randn`, and every condition
+    in this probe has to start from the same point of the noise space. The scheduler is the
+    checkpoint's own, so `num_inference_steps`, the beta schedule and `prediction_type` all
+    come from the trained config.
+    """
+    sample = x0
+    sched = objective.noise_scheduler
+    sched.set_timesteps(objective.num_inference_steps)
+    for t in sched.timesteps:
+        out = model(sample, torch.full(sample.shape[:1], t, dtype=torch.long, device=sample.device),
+                    conditioning_vec=cond)
+        sample = sched.step(out, t, sample).prev_sample
+    return sample
+
+
+def make_sampler(policy, cfg):
+    """One `(x0, cond) -> chunk` callable, whichever objective the checkpoint was trained with."""
+    if cfg.objective == "flow_matching":
+        return lambda x0, cond: euler_sample(model_of(policy), x0, cond, cfg.num_integration_steps)
+    return lambda x0, cond: ddim_sample(policy.objective, model_of(policy), x0, cond)
+
+
+def model_of(policy):
+    return policy.model
+
+
+def timestep_probe_values(policy, cfg, b: int, device: str):
+    """Four timesteps spanning the objective's own noise axis, in its own units.
+
+    Flow matching integrates t in [0, 1]; diffusion indexes integer training timesteps, and
+    the scheduler's inference grid is the only place the model was ever evaluated.
+    """
+    if cfg.objective == "flow_matching":
+        return [torch.full((b,), v, device=device) for v in (0.05, 0.35, 0.65, 0.95)]
+    sched = policy.objective.noise_scheduler
+    sched.set_timesteps(policy.objective.num_inference_steps)
+    ts = sched.timesteps
+    picks = [ts[int(round(f * (len(ts) - 1)))] for f in (0.95, 0.65, 0.35, 0.05)]
+    return [torch.full((b,), int(t), dtype=torch.long, device=device) for t in picks]
+
+
 def conditioning(model, batch: dict, state_token: torch.Tensor, state_adaln: torch.Tensor):
     """`ACTDiT.encode_conditioning` with the two state roads fed separately.
 
@@ -132,9 +176,10 @@ def probe(checkpoint: Path, dataset_root: Path, n_anchors: int, stride: int,
     torch.manual_seed(noise_seed)
     x0 = torch.randn(b, cfg.chunk_size, cfg.action_feature.shape[0], device=device)
 
+    sampler = make_sampler(policy, cfg)
+
     def run(bt: dict, s_token: torch.Tensor, s_adaln: torch.Tensor) -> torch.Tensor:
-        chunk = euler_sample(model, x0, conditioning(model, bt, s_token, s_adaln),
-                             cfg.num_integration_steps)
+        chunk = sampler(x0, conditioning(model, bt, s_token, s_adaln))
         return post(chunk).float().cpu()  # raw joint units (rad)
 
     # `encode_observations` reads OBS_IMAGES (the list `_prepare_batch` built), not the
@@ -159,8 +204,8 @@ def probe(checkpoint: Path, dataset_root: Path, n_anchors: int, stride: int,
     deltas = {k: (v - base).abs().mean().item() for k, v in conds.items() if k != "baseline"}
 
     # --- how loud is the timestep next to the state, inside the same adaLN vector? ---
-    t_half = torch.full((b,), 0.5, device=device)
-    t_emb = model.time_mlp(t_half)
+    t_probe = timestep_probe_values(policy, cfg, b, device)
+    t_emb = model.time_mlp(t_probe[len(t_probe) // 2])
     s_emb = model.encoder_robot_state_input_proj(state)
     lin = model.decoder.layers[0].adaln[-1]  # SiLU -> Linear
     n_t = t_emb.shape[-1]
@@ -168,13 +213,13 @@ def probe(checkpoint: Path, dataset_root: Path, n_anchors: int, stride: int,
     # --- does the velocity field depend on t at all? ---
     cond0 = conditioning(model, batch, state, state)
     xs = x0 * 0.5 + base.to(device) * 0.5  # a plausible mid-trajectory point
-    outs = [model(xs, torch.full((b,), tv, device=device), conditioning_vec=cond0)
-            for tv in (0.05, 0.35, 0.65, 0.95)]
+    outs = [model(xs, tv, conditioning_vec=cond0) for tv in t_probe]
     stacked = torch.stack(outs)
     dfdt = (stacked - stacked.mean(0, keepdim=True)).abs().mean().item()
 
     return {
         "checkpoint": str(checkpoint),
+        "objective": cfg.objective,
         "dataset": repo_id,
         "n_anchors": b,
         "noise_seed": noise_seed,
@@ -215,6 +260,24 @@ def selftest() -> None:
     # integral of t dt from 0 to 1 = 0.5; left-endpoint Euler with 10 steps gives 0.45
     out = euler_sample(LinearInT(), torch.zeros(1, 2, 2), None, 10)
     assert abs(out.mean().item() - 0.45) < 1e-5, out.mean()
+
+    # ddim_sample must honour the supplied x0 and be deterministic given it
+    class Eps(torch.nn.Module):
+        def forward(self, x, t, conditioning_vec=None):
+            return torch.zeros_like(x)
+
+    from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+
+    class Obj:
+        noise_scheduler = DDIMScheduler(num_train_timesteps=100, clip_sample=False)
+        num_inference_steps = 10
+
+    x0 = torch.randn(2, 3, 4)
+    a1 = ddim_sample(Obj(), Eps(), x0, None)
+    a2 = ddim_sample(Obj(), Eps(), x0, None)
+    assert torch.equal(a1, a2), "ddim_sample not deterministic for a fixed x0"
+    b1 = ddim_sample(Obj(), Eps(), x0 * 2.0, None)
+    assert not torch.allclose(a1, b1), "ddim_sample ignored the supplied initial noise"
 
     c = torch.tensor([[[0.0]], [[1.0]], [[4.0]]])  # pairwise |.|: 1, 4, 3 -> mean 8/3
     assert abs(pairwise_spread(c) - 8.0 / 3.0) < 1e-9, pairwise_spread(c)
