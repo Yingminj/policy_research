@@ -43,6 +43,16 @@
 
 ## 2. 离线指标：ACT-DiT 并没有比 ACT 更能泛化
 
+> **2026-08-27 补注。** 本节的 held-out 数字用的是 `batch_1`–`batch_4`（263 ep，08-07…08-12
+> 录制）。指定评测集改为 `batch_success_53_eval_data`（53 ep，08-21）之后，这两个
+> checkpoint 重测为 ACT-DiT **0.0743**（2.25× 空策略）、ACT **0.0685**（2.44×）——
+> 绝对水平好很多，**但两者互换了名次**：旧集上 ACT-DiT 略优（0.1289 vs 0.1355），
+> 评测集上 ACT 略优（0.0685 vs 0.0743）。两处差距都在 5% 以内，本节
+> "换掉解码器几乎没有改变泛化能力"的结论两边都成立。短 horizon 上评测集给的答案好一点：
+> `mae@10` ACT 0.0312 vs `hold_state` 0.0317（打平），ACT-DiT 0.0485（仍差 1.5×）。
+> 换集造成的落差见 [`act_dit-lowlr-diffusion-2026-08.md`](act_dit-lowlr-diffusion-2026-08.md) §4.3。
+> 下面表里的数字保持原样。
+
 用 `scripts_act_eval_test/offline_chunk_eval.py`（同一套指纹去污染 + `hold_state` 空策略基线）
 在**训练时没见过**的 263 个 episode 上评测。`hold_state` = 整个 chunk 都输出当前实测关节角，
 也就是"什么都不做"。
