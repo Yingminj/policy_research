@@ -1,0 +1,120 @@
+### eval53 (designated eval set)
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.05667  deployed=0.05283  hold_state=0.09705  (30s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.05667  rmse=0.10599  norm_mae=0.17459  
+  policy_deployed    mae=0.05283  rmse=0.10211  norm_mae=0.16389  
+  hold_state         mae=0.09705  rmse=0.20211  norm_mae=0.29884  
+  train_mean         mae=0.31868  rmse=0.38410  norm_mae=0.88193  
+  filt_0_clip_only   mae=0.05647  rmse=0.10596  norm_mae=0.17419    -0.4% vs raw
+  filt_1_rollbacks   mae=0.05649  rmse=0.10598  norm_mae=0.17423    -0.3% vs raw
+  filt_2_gripper_loops mae=0.05649  rmse=0.10598  norm_mae=0.17423    -0.3% vs raw
+  filt_3_smoothing   mae=0.05646  rmse=0.10594  norm_mae=0.17414    -0.4% vs raw
+  filt_4_excursions  mae=0.05646  rmse=0.10594  norm_mae=0.17414    -0.4% vs raw
+  filt_5_bridge      mae=0.05283  rmse=0.10211  norm_mae=0.16389    -6.8% vs raw
+  filt_bridge_only   mae=0.05305  rmse=0.10239  norm_mae=0.16455    -6.4% vs raw
+  policy_raw vs null: 1.71x
+  policy_deployed vs null: 1.84x
+
+wrote /home/kewei/YING/paper/policy/experiment_report/test_scripts/scripts_act_dit_eval_fix/eval53_dit_deployed.json
+
+real	0m35.243s
+user	1m20.270s
+sys	0m17.847s
+### in-training control
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+[tidy_up_stationery_le/batch_success_361] 15035 anchors  raw=0.03407  deployed=0.03315  hold_state=0.08730  (203s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03407  rmse=0.07142  norm_mae=0.10381  
+  policy_deployed    mae=0.03315  rmse=0.07092  norm_mae=0.10054  
+  hold_state         mae=0.08730  rmse=0.18856  norm_mae=0.26479  
+  train_mean         mae=0.31561  rmse=0.38934  norm_mae=0.86524  
+  filt_0_clip_only   mae=0.03389  rmse=0.07140  norm_mae=0.10344    -0.5% vs raw
+  filt_1_rollbacks   mae=0.03391  rmse=0.07143  norm_mae=0.10349    -0.5% vs raw
+  filt_2_gripper_loops mae=0.03391  rmse=0.07143  norm_mae=0.10349    -0.5% vs raw
+  filt_3_smoothing   mae=0.03386  rmse=0.07138  norm_mae=0.10336    -0.6% vs raw
+  filt_4_excursions  mae=0.03386  rmse=0.07138  norm_mae=0.10336    -0.6% vs raw
+  filt_5_bridge      mae=0.03315  rmse=0.07092  norm_mae=0.10054    -2.7% vs raw
+  filt_bridge_only   mae=0.03354  rmse=0.07140  norm_mae=0.10164    -1.6% vs raw
+  policy_raw vs null: 2.56x
+  policy_deployed vs null: 2.63x
+
+wrote /home/kewei/YING/paper/policy/experiment_report/test_scripts/scripts_act_dit_eval_fix/intrain_control_dit_deployed.json
+
+real	3m27.496s
+user	8m26.593s
+sys	1m16.908s
+### held-out batch_1-6, contamination filtered
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+[tidy_up_stationery_le/batch_1] 2322 anchors  raw=0.10660  deployed=0.08961  hold_state=0.08483  (35s)
+[tidy_up_stationery_le/batch_2] 1079 anchors  raw=0.10292  deployed=0.09165  hold_state=0.09988  (17s)
+[tidy_up_stationery_le/batch_3] 3638 anchors  raw=0.09957  deployed=0.09075  hold_state=0.10826  (51s)
+[tidy_up_stationery_le/batch_4] 1858 anchors  raw=0.06598  deployed=0.05929  hold_state=0.09093  (27s)
+[tidy_up_stationery_le/batch_5] SKIPPED - all 30 episodes are in the training set
+[tidy_up_stationery_le/batch_6] SKIPPED - all 61 episodes are in the training set
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.09478  rmse=0.17171  norm_mae=0.28630  
+  policy_deployed    mae=0.08397  rmse=0.16306  norm_mae=0.25215  
+  hold_state         mae=0.09747  rmse=0.20215  norm_mae=0.29401  
+  train_mean         mae=0.30876  rmse=0.38296  norm_mae=0.85444  
+  filt_0_clip_only   mae=0.09460  rmse=0.17162  norm_mae=0.28593    -0.2% vs raw
+  filt_1_rollbacks   mae=0.09464  rmse=0.17168  norm_mae=0.28605    -0.2% vs raw
+  filt_2_gripper_loops mae=0.09464  rmse=0.17168  norm_mae=0.28605    -0.1% vs raw
+  filt_3_smoothing   mae=0.09443  rmse=0.17134  norm_mae=0.28552    -0.4% vs raw
+  filt_4_excursions  mae=0.09443  rmse=0.17134  norm_mae=0.28552    -0.4% vs raw
+  filt_5_bridge      mae=0.08397  rmse=0.16306  norm_mae=0.25215   -11.4% vs raw
+  filt_bridge_only   mae=0.08407  rmse=0.16330  norm_mae=0.25231   -11.3% vs raw
+  policy_raw vs null: 1.03x
+  policy_deployed vs null: 1.16x
+
+wrote /home/kewei/YING/paper/policy/experiment_report/test_scripts/scripts_act_dit_eval_fix/heldout_clean_dit_deployed.json
+
+real	2m15.918s
+user	5m31.565s
+sys	1m7.955s
+### within-session control: seen half of batch_4
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+[tidy_up_stationery_le/batch_4] 1507 anchors  raw=0.03208  deployed=0.02655  hold_state=0.06342  (23s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03208  rmse=0.06911  norm_mae=0.09773  
+  policy_deployed    mae=0.02655  rmse=0.06157  norm_mae=0.08070  
+  hold_state         mae=0.06342  rmse=0.14087  norm_mae=0.19386  
+  train_mean         mae=0.28872  rmse=0.36100  norm_mae=0.79574  
+  filt_0_clip_only   mae=0.03192  rmse=0.06909  norm_mae=0.09740    -0.5% vs raw
+  filt_1_rollbacks   mae=0.03194  rmse=0.06912  norm_mae=0.09747    -0.4% vs raw
+  filt_2_gripper_loops mae=0.03194  rmse=0.06912  norm_mae=0.09747    -0.4% vs raw
+  filt_3_smoothing   mae=0.03190  rmse=0.06909  norm_mae=0.09734    -0.6% vs raw
+  filt_4_excursions  mae=0.03190  rmse=0.06909  norm_mae=0.09734    -0.6% vs raw
+  filt_5_bridge      mae=0.02655  rmse=0.06157  norm_mae=0.08070   -17.3% vs raw
+  filt_bridge_only   mae=0.02688  rmse=0.06196  norm_mae=0.08170   -16.2% vs raw
+  policy_raw vs null: 1.98x
+  policy_deployed vs null: 2.39x
+
+wrote /home/kewei/YING/paper/policy/experiment_report/test_scripts/scripts_act_dit_eval_fix/within_session_control_batch4_seen_dit_deployed.json
+
+real	0m27.969s
+user	1m5.112s
+sys	0m14.873s
