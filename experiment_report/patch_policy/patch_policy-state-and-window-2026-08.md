@@ -42,7 +42,9 @@
 **一句话的取舍：** 两个新权重都不应上机。`new_obs2` 的方向是对的（省掉的算力是白捡的），
 但它证明的是"多出来的观测帧本来就没用"，而不是"精度提高了"。**下一次改动应当只做一件事：
 让策略真正读到本体感觉**——当前的做法（把 1 个 state token 拼进 768 个 patch token 里）
-被实测证明无效，§7.3 给了三条可查的假设。
+被实测证明无效。§7.3 列了三条可查的假设，其中**两条已在同日被后续测量证伪**
+（state token 拿到 8.65 倍于均分份额的注意力、范数正常），剩下的只有"目标参数化让它冗余"，
+所以下一步要改的是**训练目标**（相对动作），不是条件化方式。§7.4 解释这个开关在代码里到底改了什么。
 
 ---
 
@@ -367,7 +369,7 @@ N = 2 007，单位弧度，越小越好。`@k` = 前 k 步累计 MAE。
 **`n_obs_steps` 从 5 降到 2 之后，剩下那一帧多余的历史仍然只值 1.5%。**
 按这批测量，`n_obs_steps=1` 的代价上界约为 1.5%——远在采样噪声（3.3%）以内。
 
-### 7.3 为什么 state token 没被用起来（假设，未验证）
+### 7.3 为什么 state token 没被用起来（三条假设，其中两条已于 2026-08-31 证伪）
 
 三条可查的假设，按可验证性排序：
 
@@ -381,6 +383,88 @@ N = 2 007，单位弧度，越小越好。`@k` = 前 k 步累计 MAE。
    输出的激活幅度与 patch token 的比值。
 
 **这三条本报告都没有测**，列出来是为了下一次改动不再只翻一个布尔开关。
+
+#### Update 2026-08-31：假设 1 和 3 已被证伪
+
+`scripts_patch_policy_eval_fix/measure_state_token.py`，同一 checkpoint `new_state5`，
+16 个 anchor，`batch_success_53_eval_data`：
+
+| 量 | 实测 |
+|---|---:|
+| memory 槽位总数（1 timestep + 5 × 769） | 3 846 |
+| 其中 state 槽位 5 个 → **均分份额** | 0.130 % |
+| decoder cross-attention 落在 state 槽位上的质量 | **1.12 % = 8.65× 均分份额** |
+| `‖state 槽位‖ / mean ‖patch 槽位‖`（memory 空间） | **0.76** |
+
+* **假设 1（被 768 个 patch token 淹没）证伪。** 模型主动多看它 8.65 倍，不是看不见。
+  推论：**把 state token 复制成 K 份不会有用**——只是把同一份 softmax 质量拆开。
+* **假设 3（归一化尺度失配）证伪。** 范数 0.76，与 patch token 同量级，没有被压扁或炸开。
+* **剩下假设 2。** token 被找到了、幅度正常、换掉它却只移动 6.7%——说明模型读了之后
+  没有把它用在输出上。在示教数据里 `action_t ≈ state_t`（0.0140 rad），而图像已经能
+  定位到 0.04 rad；在**绝对动作**参数化下，"把 state 抄进输出"这条恒等映射要穿过
+  `MLP → 加性进 memory → cross-attention → 去噪器` 才能实现，梯度信号太弱，从未被学出来。
+
+**结论换向：修 target，不是修 conditioning。** 把 `lerobot/policies/act_delta/` 的
+`use_relative_actions` 移植进 patch_policy，让模型预测 `action − state`：恒等映射变成"输出 0"，
+位姿锚定问题在结构上消失，而不是指望模型自己学会去重视那一个 token。
+在 `batch_success_361`、chunk_size 50 上的 pre-gate 中位数 **0.529**（逐维 0.376–0.722，
+§4.3 里最差的 J7 收缩最多），夹爪维 ≈0.99，所以保留 `--exclude-joints gripper`。
+记录在 memory `patch-policy-state-token-is-read-not-drowned`。
+
+### 7.4 `use_robot_state` 在代码里究竟改了什么（以及 ACT 为什么没有这个开关）
+
+三处，加起来约 10 行。它是**条件输入开关，不是数据开关**：`observation.state` 一直在数据集里、
+一直被 normalize，只是模型看不看它。
+
+| 位置 | 改动 |
+|---|---|
+| `configuration_patch_policy.py:256` | `use_robot_state: bool = False`（reference 默认）；`:378` 只做一个校验：开了但数据集没有 state feature 就报错 |
+| `modeling_patch_policy.py:363-368` | `tokens_per_frame += int(use_robot_state)`；建 `state_projector = MLP(16 → feature_dim)`，注释原文 `# The reference has no state pathway at all; this is a lerobot-side addition.` |
+| `modeling_patch_policy.py:429-434` | `encode_observations` 里把投影后的 state token 拼到 patch token 后面 |
+
+```python
+if self.config.use_robot_state:
+    state_token = self.state_projector(batch[OBS_STATE]).unsqueeze(2)  # (b, s, 1, e)
+    patch_tokens = torch.cat([patch_tokens, state_token], dim=2)       # 每帧 768 -> 769
+```
+
+**没有改 loss、没有改 block-causal mask**（帧内 token 天然双向可见，README *Token layout* 一节
+明说 mask 不需要变）、**没有改 decoder**。本报告配置下的量级：
+
+| | `False`（`new_obs2` 等） | `True`（`new_state5`） |
+|---|---:|---:|
+| 每帧 token（DINOv2 ViT-S/14, 224², 3 相机） | 3 × 256 = 768 | **769** |
+| diffusion memory（1 timestep + `n_obs_steps` × 每帧） | 3 841 @ 5 帧 | **3 846** @ 5 帧 |
+| state 占 memory 的比例 | 0 | **0.130 %** |
+
+唯一的隐藏副作用在 `vqbet` 头上（README *Deviation 5*）：VQ-BeT 读每帧 block 的**最后一个 token**，
+开了之后读出点从"最后一个 patch"变成 state token。本报告全部是 `diffusion` / `act` 头，不受影响。
+
+**ACT 没有这个开关。** `act` 用的是 `config.robot_state_feature`，而它是
+`configs/policies.py:133` 的一个**派生属性**——数据集里有 `observation.state` 就自动接上，
+没有配置项能关掉。所以前置报告 §7 那句"两个 head 表现一样是因为共用同一个
+`use_robot_state=False`"能成立，前提正是 ACT 侧不存在这种失配。ACT 还**用了两次**
+（`modeling_act.py`）：
+
+1. `:412-421` **VAE encoder（仅训练时）**：输入序列是 `[cls, robot_state, *action_sequence]`,
+   所以风格 latent 天然编码的是"相对于当前位姿的动作模式"。
+2. `:461-476` **Transformer encoder**：token 列 `[latent, robot_state, (env_state), *image_patches]`,
+   state 走 `nn.Linear(16, 512)` 并有**专属的 `encoder_1d_feature_pos_embed`**。
+
+token 比例上 ACT 并不比 patch_policy 宽裕：ResNet-18 在 640×480 上给出 20×15 = 300 token/相机,
+三相机 ≈900，state 同样是 1/900 左右。**所以差别不在稀释度**（上面的 Update 也独立证实了这点）,
+而在三处：ACT 的视觉 backbone 端到端训练，梯度可以塑造图像特征去和 state 互补；VAE latent 把
+state 与动作序列绑在一起编码；ACT 每次只看一帧，没有 5 × 768 个 patch 的时间维。
+
+**为什么关掉本体感觉照样能训练、loss 照样降到 0.014。** 监督回归不要求输入充分，只要求输入与
+目标相关。目标是 16 个绝对关节角，"从三张图回归当前位姿 + 未来 50 帧"是个有解的问题，梯度下降
+一定会收敛到某个东西——§2.2 两条 loss 曲线几乎重合，打开本体感觉没让它下得更快。模型学到的是
+"看画面像任务的哪个阶段，就输出那个阶段的平均位姿"：在 loss 上是好解（363 episode、单场景，
+平均轨迹本身信息量就大），作为控制指令则封顶在前置报告 §5 量到的 **0.066 rad**,
+而一个部署 waypoint 要表达的全部运动量只有 **0.032 rad**。
+**能训练 ≠ 能训练好。** reference 敢默认关掉，是因为它跑的是 PushT 之类的俯视仿真基准,
+末端位置在画面里一目了然、视觉本身就是充分观测；搬到顶视几乎看不见手臂、腕部相机是自我中心
+视角的这套真机上，同一个默认值就从"合理简化"变成"关键输入缺失"。
 
 ---
 
@@ -428,9 +512,11 @@ batch 1，GPU 独占，预热 3 次后取 20 次的中位数。窗口 = `n_actio
 
 1. **两个新权重都不上机。** `new_obs2` 可作为后续实验的基座（同精度、一半算力），
    但它相对上一代冠军 `prev_act_head` 的优势（2.5–3.6%）落在噪声边缘。
-2. **下一次只改一件事：让 state 真正进入模型。** §7.3 的三条假设里，第 1 条
-   （state token 被 768 个 patch token 淹没）最容易验证也最容易改。
-   在此之前再翻 `use_robot_state` 这个开关不会有任何变化。
+2. **下一次只改一件事：把训练目标换成相对动作。**（2026-08-31 修订，原文建议先试
+   "复制 state token"，已被同日的注意力测量否掉——见 §7.3 Update：token 拿到 8.65 倍
+   均分份额的注意力、范数 0.76，**没有被淹没，复制它只会拆分同一份 softmax 质量**。）
+   移植 `lerobot/policies/act_delta/` 的 `use_relative_actions`，让模型预测 `action − state`,
+   保留 `--exclude-joints gripper`。再翻 `use_robot_state` 这个开关不会有任何变化。
 3. **`n_obs_steps` 设为 1 或 2，不要 5。** 按 §7.2，第 5 帧到第 2 帧的信息量 ≤2.8%，
    第 2 帧到第 1 帧 ≤1.5%，都在噪声内；而算力是线性的。
 4. **扩散头需要减去噪步数或换头。** 100 步 DDPM 占了延迟的 98%。
@@ -461,6 +547,12 @@ cd $S
 
 # 3) 条件化探针：模型到底看什么（~6 min）
 ./run_probe.sh                   # -> probe_*.json
+
+# 3b) state token 的注意力份额与范数（§7.3 Update，~1 min）
+/opt/robot-platform/train-venv/bin/python measure_state_token.py \
+  --checkpoint <new_state5>/run/checkpoints/200000/pretrained_model \
+  --dataset-root /mnt/robot_platform/datasets/tidy_up_stationery_le/batch_success_53_eval_data \
+  --out state_token_new_state5.json
 
 # 4) 延迟（跑之前确认 GPU 无其他进程，~2 min）
 /opt/robot-platform/train-venv/bin/python latency.py --out latency.json
