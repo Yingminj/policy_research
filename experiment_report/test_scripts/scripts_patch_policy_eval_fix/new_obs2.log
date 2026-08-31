@@ -1,0 +1,33 @@
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0, 1 extra sampling seeds
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.06190  deployed=0.05838  hold_state=0.09705  (295s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.06190  rmse=0.10713  norm_mae=0.19323  
+  policy_deployed    mae=0.05838  rmse=0.10897  norm_mae=0.18142  
+  hold_state         mae=0.09705  rmse=0.20211  norm_mae=0.29884  
+  train_mean         mae=0.31868  rmse=0.38410  norm_mae=0.88193  
+  filt_0_clip_only   mae=0.06190  rmse=0.10713  norm_mae=0.19323    +0.0% vs raw
+  filt_1_rollbacks   mae=0.06190  rmse=0.10711  norm_mae=0.19323    -0.0% vs raw
+  filt_2_gripper_loops mae=0.06190  rmse=0.10711  norm_mae=0.19323    -0.0% vs raw
+  filt_3_smoothing   mae=0.06178  rmse=0.10698  norm_mae=0.19284    -0.2% vs raw
+  filt_4_excursions  mae=0.06178  rmse=0.10698  norm_mae=0.19284    -0.2% vs raw
+  filt_5_bridge      mae=0.05838  rmse=0.10897  norm_mae=0.18142    -5.7% vs raw
+  filt_bridge_only   mae=0.05924  rmse=0.11065  norm_mae=0.18410    -4.3% vs raw
+  seed_1             mae=0.06272  rmse=0.10794  norm_mae=0.19575  
+  policy_raw vs null: 1.57x
+  policy_deployed vs null: 1.66x
+
+wrote new_obs2.json
