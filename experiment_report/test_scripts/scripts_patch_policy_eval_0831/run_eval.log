@@ -1,0 +1,287 @@
+=== vqbet_100k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+number of parameters: 25.69M
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=5, action offset 4, seed 0, 1 extra sampling seeds
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+contamination filter: 363 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.06723  deployed=0.05897  hold_state=0.09705  (131s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.06723  rmse=0.10857  norm_mae=0.20836  
+  policy_deployed    mae=0.05897  rmse=0.10591  norm_mae=0.18368  
+  hold_state         mae=0.09705  rmse=0.20211  norm_mae=0.29884  
+  train_mean         mae=0.31868  rmse=0.38410  norm_mae=0.88193  
+  filt_0_clip_only   mae=0.06674  rmse=0.10840  norm_mae=0.20735    -0.7% vs raw
+  filt_1_rollbacks   mae=0.06672  rmse=0.10837  norm_mae=0.20730    -0.8% vs raw
+  filt_2_gripper_loops mae=0.06672  rmse=0.10837  norm_mae=0.20730    -0.8% vs raw
+  filt_3_smoothing   mae=0.06644  rmse=0.10809  norm_mae=0.20641    -1.2% vs raw
+  filt_4_excursions  mae=0.06644  rmse=0.10809  norm_mae=0.20641    -1.2% vs raw
+  filt_5_bridge      mae=0.05897  rmse=0.10591  norm_mae=0.18368   -12.3% vs raw
+  filt_bridge_only   mae=0.06049  rmse=0.10866  norm_mae=0.18833   -10.0% vs raw
+  seed_1             mae=0.06725  rmse=0.10870  norm_mae=0.20844  
+  policy_raw vs null: 1.44x
+  policy_deployed vs null: 1.65x
+
+wrote vqbet_100k.json
+=== vqbet_100k_h8
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+number of parameters: 25.69M
+Loading weights from local directory
+executed horizon: 8/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=5, action offset 4, seed 0
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+contamination filter: 363 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.05501  deployed=0.03572  hold_state=0.02822  (69s)
+
+=== aggregate over all held-out datasets (executed horizon 8 steps) ===
+  policy_raw         mae=0.05501  rmse=0.08494  norm_mae=0.17025  
+  policy_deployed    mae=0.03572  rmse=0.06563  norm_mae=0.10894  
+  hold_state         mae=0.02822  rmse=0.06273  norm_mae=0.08608  
+  train_mean         mae=0.31795  rmse=0.38307  norm_mae=0.87905  
+  filt_0_clip_only   mae=0.05459  rmse=0.08485  norm_mae=0.16938    -0.8% vs raw
+  filt_1_rollbacks   mae=0.05457  rmse=0.08482  norm_mae=0.16933    -0.8% vs raw
+  filt_2_gripper_loops mae=0.05457  rmse=0.08482  norm_mae=0.16933    -0.8% vs raw
+  filt_3_smoothing   mae=0.05433  rmse=0.08454  norm_mae=0.16855    -1.2% vs raw
+  filt_4_excursions  mae=0.05433  rmse=0.08454  norm_mae=0.16855    -1.2% vs raw
+  filt_5_bridge      mae=0.03572  rmse=0.06563  norm_mae=0.10894   -35.1% vs raw
+  filt_bridge_only   mae=0.03572  rmse=0.06563  norm_mae=0.10894   -35.1% vs raw
+  policy_raw vs null: 0.51x
+  policy_deployed vs null: 0.79x
+
+wrote vqbet_100k_h8.json
+=== vqbet_050k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+number of parameters: 25.69M
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=5, action offset 4, seed 0
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+contamination filter: 363 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.07971  deployed=0.06522  hold_state=0.09705  (75s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.07971  rmse=0.12355  norm_mae=0.24527  
+  policy_deployed    mae=0.06522  rmse=0.11443  norm_mae=0.20241  
+  hold_state         mae=0.09705  rmse=0.20211  norm_mae=0.29884  
+  train_mean         mae=0.31868  rmse=0.38410  norm_mae=0.88193  
+  filt_0_clip_only   mae=0.07904  rmse=0.12340  norm_mae=0.24391    -0.8% vs raw
+  filt_1_rollbacks   mae=0.07900  rmse=0.12332  norm_mae=0.24378    -0.9% vs raw
+  filt_2_gripper_loops mae=0.07900  rmse=0.12332  norm_mae=0.24378    -0.9% vs raw
+  filt_3_smoothing   mae=0.07806  rmse=0.12230  norm_mae=0.24080    -2.1% vs raw
+  filt_4_excursions  mae=0.07806  rmse=0.12230  norm_mae=0.24080    -2.1% vs raw
+  filt_5_bridge      mae=0.06522  rmse=0.11443  norm_mae=0.20241   -18.2% vs raw
+  filt_bridge_only   mae=0.06766  rmse=0.11867  norm_mae=0.20969   -15.1% vs raw
+  policy_raw vs null: 1.22x
+  policy_deployed vs null: 1.49x
+
+wrote vqbet_050k.json
+=== eef_200k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0, 1 extra sampling seeds
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 505 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 2814 anchors  raw=0.03323  deployed=0.03323  hold_state=0.06649  (392s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03323  rmse=0.07548  norm_mae=0.16988  
+  policy_deployed    mae=0.03323  rmse=0.07548  norm_mae=0.16988  
+  hold_state         mae=0.06649  rmse=0.16578  norm_mae=0.33420  
+  train_mean         mae=0.22988  rmse=0.33833  norm_mae=0.86011  
+  seed_1             mae=0.03362  rmse=0.07591  norm_mae=0.17137  
+  policy_raw vs null: 2.00x
+  policy_deployed vs null: 2.00x
+
+wrote eef_200k.json
+=== eef_200k_h60
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 505 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 2814 anchors  raw=0.03323  deployed=0.03323  hold_state=0.06649  (195s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03323  rmse=0.07548  norm_mae=0.16988  
+  policy_deployed    mae=0.03323  rmse=0.07548  norm_mae=0.16988  
+  hold_state         mae=0.06649  rmse=0.16578  norm_mae=0.33420  
+  train_mean         mae=0.22988  rmse=0.33833  norm_mae=0.86011  
+  policy_raw vs null: 2.00x
+  policy_deployed vs null: 2.00x
+
+wrote eef_200k_h60.json
+=== eef_100k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 505 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 2814 anchors  raw=0.04105  deployed=0.04105  hold_state=0.06649  (195s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.04105  rmse=0.08687  norm_mae=0.20477  
+  policy_deployed    mae=0.04105  rmse=0.08687  norm_mae=0.20477  
+  hold_state         mae=0.06649  rmse=0.16578  norm_mae=0.33420  
+  train_mean         mae=0.22988  rmse=0.33833  norm_mae=0.86011  
+  policy_raw vs null: 1.62x
+  policy_deployed vs null: 1.62x
+
+wrote eef_100k.json
+=== eef_200k_fair
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 742 anchors  raw=0.03588  deployed=0.03588  hold_state=0.06933  (53s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03588  rmse=0.08264  norm_mae=0.18048  
+  policy_deployed    mae=0.03588  rmse=0.08264  norm_mae=0.18048  
+  hold_state         mae=0.06933  rmse=0.16756  norm_mae=0.35139  
+  train_mean         mae=0.22353  rmse=0.32664  norm_mae=0.84983  
+  policy_raw vs null: 1.93x
+  policy_deployed vs null: 1.93x
+
+wrote eef_200k_fair.json
+=== eef_200k_fair_h60
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 742 anchors  raw=0.03588  deployed=0.03588  hold_state=0.06933  (53s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03588  rmse=0.08264  norm_mae=0.18048  
+  policy_deployed    mae=0.03588  rmse=0.08264  norm_mae=0.18048  
+  hold_state         mae=0.06933  rmse=0.16756  norm_mae=0.35139  
+  train_mean         mae=0.22353  rmse=0.32664  norm_mae=0.84983  
+  policy_raw vs null: 1.93x
+  policy_deployed vs null: 1.93x
+
+wrote eef_200k_fair_h60.json
+=== acteef_361_fair
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 742 anchors  raw=0.05453  deployed=0.05453  hold_state=0.06933  (5s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.05453  rmse=0.11366  norm_mae=0.26969  
+  policy_deployed    mae=0.05453  rmse=0.11366  norm_mae=0.26969  
+  hold_state         mae=0.06933  rmse=0.16756  norm_mae=0.35176  
+  train_mean         mae=0.22475  rmse=0.32877  norm_mae=0.86079  
+  policy_raw vs null: 1.27x
+  policy_deployed vs null: 1.27x
+
+wrote acteef_361_fair.json
+=== acteef_361_fair_h60
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 60/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 742 anchors  raw=0.05769  deployed=0.05769  hold_state=0.07715  (5s)
+
+=== aggregate over all held-out datasets (executed horizon 60 steps) ===
+  policy_raw         mae=0.05769  rmse=0.11943  norm_mae=0.28682  
+  policy_deployed    mae=0.05769  rmse=0.11943  norm_mae=0.28682  
+  hold_state         mae=0.07715  rmse=0.18119  norm_mae=0.38859  
+  train_mean         mae=0.22490  rmse=0.32888  norm_mae=0.86211  
+  policy_raw vs null: 1.34x
+  policy_deployed vs null: 1.34x
+
+wrote acteef_361_fair_h60.json
+ALL DONE

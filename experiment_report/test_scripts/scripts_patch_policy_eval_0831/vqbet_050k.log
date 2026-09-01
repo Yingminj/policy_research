@@ -1,0 +1,34 @@
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+number of parameters: 25.69M
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=5, action offset 4, seed 0
+policy_deployed filters: rollbacks, gripper_loops, smoothing, excursions, bridge, gripper_clip  + per-filter ablation
+contamination filter: 363 training episodes fingerprinted from batch_success_361
+contamination filter: 363 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data] 2007 anchors  raw=0.07971  deployed=0.06522  hold_state=0.09705  (75s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.07971  rmse=0.12355  norm_mae=0.24527  
+  policy_deployed    mae=0.06522  rmse=0.11443  norm_mae=0.20241  
+  hold_state         mae=0.09705  rmse=0.20211  norm_mae=0.29884  
+  train_mean         mae=0.31868  rmse=0.38410  norm_mae=0.88193  
+  filt_0_clip_only   mae=0.07904  rmse=0.12340  norm_mae=0.24391    -0.8% vs raw
+  filt_1_rollbacks   mae=0.07900  rmse=0.12332  norm_mae=0.24378    -0.9% vs raw
+  filt_2_gripper_loops mae=0.07900  rmse=0.12332  norm_mae=0.24378    -0.9% vs raw
+  filt_3_smoothing   mae=0.07806  rmse=0.12230  norm_mae=0.24080    -2.1% vs raw
+  filt_4_excursions  mae=0.07806  rmse=0.12230  norm_mae=0.24080    -2.1% vs raw
+  filt_5_bridge      mae=0.06522  rmse=0.11443  norm_mae=0.20241   -18.2% vs raw
+  filt_bridge_only   mae=0.06766  rmse=0.11867  norm_mae=0.20969   -15.1% vs raw
+  policy_raw vs null: 1.22x
+  policy_deployed vs null: 1.49x
+
+wrote vqbet_050k.json

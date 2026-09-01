@@ -1,0 +1,20 @@
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 60/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_533_eef] 742 anchors  raw=0.05769  deployed=0.05769  hold_state=0.07715  (5s)
+
+=== aggregate over all held-out datasets (executed horizon 60 steps) ===
+  policy_raw         mae=0.05769  rmse=0.11943  norm_mae=0.28682  
+  policy_deployed    mae=0.05769  rmse=0.11943  norm_mae=0.28682  
+  hold_state         mae=0.07715  rmse=0.18119  norm_mae=0.38859  
+  train_mean         mae=0.22490  rmse=0.32888  norm_mae=0.86211  
+  policy_raw vs null: 1.34x
+  policy_deployed vs null: 1.34x
+
+wrote acteef_361_fair_h60.json
