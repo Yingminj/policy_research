@@ -1,0 +1,25 @@
+      "demo": 0.020417,
+      "ratio": 1.81
+    },
+    "eef_r_pitch": {
+      "policy": 0.037539,
+      "demo": 0.020696,
+      "ratio": 1.814
+    },
+    "eef_r_yaw": {
+      "policy": 0.041076,
+      "demo": 0.017525,
+      "ratio": 2.344
+    },
+    "gripper_L": {
+      "policy": 0.009284,
+      "demo": 0.00027,
+      "ratio": 34.369
+    },
+    "gripper_R": {
+      "policy": 0.017847,
+      "demo": 3e-05,
+      "ratio": 598.691
+    }
+  }
+}

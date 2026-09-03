@@ -1,0 +1,142 @@
+=== pp_eef_200k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0, 1 extra sampling seeds
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.03721  deployed=0.03721  hold_state=0.07266  (278s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03721  rmse=0.07869  norm_mae=0.18789  
+  policy_deployed    mae=0.03721  rmse=0.07869  norm_mae=0.18789  
+  hold_state         mae=0.07266  rmse=0.17191  norm_mae=0.36402  
+  train_mean         mae=0.22729  rmse=0.33229  norm_mae=0.84181  
+  seed_1             mae=0.03757  rmse=0.07903  norm_mae=0.18927  
+  policy_raw vs null: 1.95x
+  policy_deployed vs null: 1.95x
+
+wrote pp_eef_200k.json
+=== pp_eef_100k
+Using cache found in /home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/swiglu_ffn.py:51: UserWarning: xFormers is not available (SwiGLU)
+  warnings.warn("xFormers is not available (SwiGLU)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/attention.py:33: UserWarning: xFormers is not available (Attention)
+  warnings.warn("xFormers is not available (Attention)")
+/home/kewei/.cache/torch/hub/facebookresearch_dinov2_b48308a/dinov2/layers/block.py:40: UserWarning: xFormers is not available (Block)
+  warnings.warn("xFormers is not available (Block)")
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/50 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy patch_policy: n_obs_steps=2, action offset 1, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.04394  deployed=0.04394  hold_state=0.07266  (142s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.04394  rmse=0.08574  norm_mae=0.21965  
+  policy_deployed    mae=0.04394  rmse=0.08574  norm_mae=0.21965  
+  hold_state         mae=0.07266  rmse=0.17191  norm_mae=0.36402  
+  train_mean         mae=0.22729  rmse=0.33229  norm_mae=0.84181  
+  policy_raw vs null: 1.65x
+  policy_deployed vs null: 1.65x
+
+wrote pp_eef_100k.json
+=== acteef_505_200k
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.03689  deployed=0.03689  hold_state=0.07266  (11s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03689  rmse=0.07902  norm_mae=0.18170  
+  policy_deployed    mae=0.03689  rmse=0.07902  norm_mae=0.18170  
+  hold_state         mae=0.07266  rmse=0.17191  norm_mae=0.36402  
+  train_mean         mae=0.22729  rmse=0.33229  norm_mae=0.84181  
+  policy_raw vs null: 1.97x
+  policy_deployed vs null: 1.97x
+
+wrote acteef_505_200k.json
+=== acteef_505_100k
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.03704  deployed=0.03704  hold_state=0.07266  (11s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03704  rmse=0.07951  norm_mae=0.18261  
+  policy_deployed    mae=0.03704  rmse=0.07951  norm_mae=0.18261  
+  hold_state         mae=0.07266  rmse=0.17191  norm_mae=0.36402  
+  train_mean         mae=0.22729  rmse=0.33229  norm_mae=0.84181  
+  policy_raw vs null: 1.96x
+  policy_deployed vs null: 1.96x
+
+wrote acteef_505_100k.json
+=== acteef_505_h60
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 60/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.03961  deployed=0.03961  hold_state=0.08216  (11s)
+
+=== aggregate over all held-out datasets (executed horizon 60 steps) ===
+  policy_raw         mae=0.03961  rmse=0.08481  norm_mae=0.19499  
+  policy_deployed    mae=0.03961  rmse=0.08481  norm_mae=0.19499  
+  hold_state         mae=0.08216  rmse=0.19004  norm_mae=0.40756  
+  train_mean         mae=0.22747  rmse=0.33245  norm_mae=0.84317  
+  policy_raw vs null: 2.07x
+  policy_deployed vs null: 2.07x
+
+wrote acteef_505_h60.json
+=== acteef_361_200k
+selftest OK (accumulator)
+selftest OK (deploy rewrite + filter selection)
+Loading weights from local directory
+executed horizon: 50/100 steps, latency offset 0, deploy rewrite from /home/kewei/YING/lerobot_vlahost
+policy act_eef: n_obs_steps=1, action offset 0, seed 0
+policy_deployed filters: (none)
+contamination filter: 505 training episodes fingerprinted from batch_success_505_eef
+contamination filter: 363 training episodes fingerprinted from batch_success_361_eef
+contamination filter: 554 unique training episodes total
+[tidy_up_stationery_le/batch_success_53_eval_data_eef] 2007 anchors  raw=0.03568  deployed=0.03568  hold_state=0.07266  (11s)
+
+=== aggregate over all held-out datasets (executed horizon 50 steps) ===
+  policy_raw         mae=0.03568  rmse=0.07465  norm_mae=0.17768  
+  policy_deployed    mae=0.03568  rmse=0.07465  norm_mae=0.17768  
+  hold_state         mae=0.07266  rmse=0.17191  norm_mae=0.36521  
+  train_mean         mae=0.22703  rmse=0.33181  norm_mae=0.84184  
+  policy_raw vs null: 2.04x
+  policy_deployed vs null: 2.04x
+
+wrote acteef_361_200k.json
+ALL DONE

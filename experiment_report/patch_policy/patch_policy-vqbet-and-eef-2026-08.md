@@ -13,6 +13,13 @@ EEF 侧 `batch_success_533_eef` 中未被训练集覆盖的 **67 个 episode**�
 **前置报告** `patch_policy-state-and-window-2026-08.md`（§7.3 留下的那条未证伪假设，本次被证实）、
 `patch_policy-optimization-proposals-2026-08.md`、`patch_policy-head-comparison-2026-08.md`
 
+> ⚠️ **本报告的 EEF 部分已被 `patch_policy-eef-independent-eval-2026-09.md` 推翻。**
+> 2026-09-02 在独立采集的 53-episode EEF 评测集上重评：§1.1 的"比 ACT 好 34%"和 §5.3 那张表
+> 是**评测集造成的假象**（同一个 `act_eef` checkpoint 在独立场次上比在那 18 个 episode 上好 35%），
+> §1.2 的"chunk 第一步已经比站着不动好"也不成立。§3.2 关于 EEF 位姿来源的说法是错的：
+> EEF 数据集是关节数据集经 `tool/tr_joint_to_eef.py` 的正运动学重投影，逐位可复现。
+> `vqbet` 部分（§4、§8）未受影响。
+
 ---
 
 ## 1. 结论
