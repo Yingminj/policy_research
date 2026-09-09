@@ -1,0 +1,3101 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACT 与 ACT-EEF 策略族实验结果汇总报告</title><style>
+:root{--fg:#1a1a1a;--muted:#5b6470;--bd:#d8dee6;--bg:#fff;--soft:#f6f8fa;--accent:#0b5fa5}
+@media (prefers-color-scheme:dark){:root{--fg:#e6e6e6;--muted:#9aa4b1;--bd:#333b45;--bg:#14171a;--soft:#1c2126;--accent:#6cb6ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+ font-family:"Source Han Serif SC","Noto Serif CJK SC",Georgia,"Songti SC",serif;
+ font-size:16px;line-height:1.75}
+.wrap{max-width:1080px;margin:0 auto;padding:3rem 1.5rem 6rem}
+h1{font-size:1.9rem;line-height:1.35;margin:0 0 .4rem;letter-spacing:-.01em}
+h2{font-size:1.4rem;margin:3rem 0 .8rem;padding-bottom:.35rem;border-bottom:2px solid var(--bd)}
+h3{font-size:1.13rem;margin:2rem 0 .6rem}
+h4{font-size:1rem;margin:1.4rem 0 .5rem;color:var(--muted)}
+p,li{margin:.6rem 0}
+hr{border:0;border-top:1px solid var(--bd);margin:2.5rem 0}
+a{color:var(--accent)}
+code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.87em;
+ background:var(--soft);border:1px solid var(--bd);border-radius:4px;padding:.06em .34em}
+pre{background:var(--soft);border:1px solid var(--bd);border-radius:6px;padding:.9rem 1rem;
+ overflow-x:auto;font-size:.85rem;line-height:1.5}
+pre code{background:none;border:0;padding:0}
+blockquote{margin:1rem 0;padding:.2rem 0 .2rem 1rem;border-left:3px solid var(--bd);color:var(--muted)}
+table{border-collapse:collapse;width:100%;margin:.8rem 0 1.4rem;font-size:.855rem;
+ font-family:system-ui,-apple-system,"Noto Sans CJK SC",sans-serif;line-height:1.5}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+th,td{border:1px solid var(--bd);padding:.4rem .6rem;text-align:left;vertical-align:top}
+th{background:var(--soft);font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:color-mix(in srgb,var(--soft) 55%,transparent)}
+td[style*=right],th[style*=right]{font-variant-numeric:tabular-nums}
+strong{font-weight:700}
+em{color:var(--muted)}
+.toc{background:var(--soft);border:1px solid var(--bd);border-radius:8px;padding:.4rem 1.2rem 1rem;margin:2rem 0;
+ font-family:system-ui,-apple-system,"Noto Sans CJK SC",sans-serif;font-size:.9rem}
+.toc>ul{padding-left:1.1rem}.toc ul ul{padding-left:1.1rem;font-size:.93em;color:var(--muted)}
+.toc li{margin:.18rem 0}.toc a{text-decoration:none}.toc a:hover{text-decoration:underline}
+.toctitle{font-weight:700;font-size:1rem;margin:.9rem 0 .3rem;color:var(--fg)}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2rem;
+ font-family:system-ui,-apple-system,"Noto Sans CJK SC",sans-serif}
+@media print{body{font-size:11pt}.wrap{max-width:none;padding:0}.toc{break-after:page}
+ h2{break-after:avoid}table{break-inside:auto;font-size:9pt}tr{break-inside:avoid}}
+</style></head>
+<body><div class="wrap">
+<div class="meta">二次汇编 · 2026-09-09 · <code>policy/experiment_report/act/</code></div>
+<h1 id="act-act-eef">ACT 与 ACT-EEF 策略族实验结果汇总报告</h1>
+<p><strong>任务</strong> <code>tidy_up_stationery_le</code>（双臂文具整理）
+<strong>时间跨度</strong> 2026-08-07 — 2026-09-08
+<strong>汇编日期</strong> 2026-09-09
+<strong>汇编范围</strong> <code>policy/experiment_report/act/</code> 下全部十份原始报告与审计记录
+<strong>性质</strong> 二次汇编。本报告不产生任何新测量，全部数值均可回溯至下节所列的原始报告与 run 目录；
+凡与原始报告有出入之处，以原始报告为准。</p>
+<hr />
+<h2 id="_1">摘要</h2>
+<p>本报告汇总 <code>act</code>（16 维关节动作空间）与 <code>act_eef</code>（14 维末端位姿动作空间）两条策略线在
+<code>tidy_up_stationery_le</code> 任务上的全部已完成实验，共涉及 <strong>5 份 <code>act_eef</code> 权重、3 份失败数据消融权重、
+2 份 <code>act_delta</code> 相对动作权重、11 组架构深度配置</strong>，以及 <strong>480 次真机试验</strong>。</p>
+<p>主要发现如下。</p>
+<ol>
+<li><strong>离线开环精度指标与真机成功率在本任务上呈显著负相关。</strong> 在 5 个同时具备离线与真机数据的
+   条件格上，四项准确度型指标（平坦 14 维 MAE、acc@0.25σ、末端位置误差、末端姿态误差）与真机成功率的
+   Spearman 秩相关一致为 <strong>ρ = −0.949</strong>，而唯一的平滑度型指标（执行轨迹二阶差分）为 <strong>ρ = +0.973</strong>
+   （表 19）。问题不在分辨力，而在符号。</li>
+<li><strong>时序集成系数 <code>temporal_ensemble_coeff</code> 是本轮唯一达到统计显著的可操作变量。</strong>
+   由 0.01 改为 −0.05 使成功率自 80% 降至 50%，三份权重独立复现方向一致，
+   合并 72/90 vs 45/90，Fisher 精确检验 <strong>p = 4.0 × 10⁻⁵</strong>（表 16）。离线 MAE 在此对比上给出相反排序。</li>
+<li><strong>数据配方在 <code>act_eef</code> 上不是有效杠杆。</strong> 训练集自 363 集增至 616 集，离线 MAE 全跨度仅
+   <strong>7.4%</strong>（0.03689–0.03961），其中约 2% 属训练噪声，而五份权重相对空基线的共同领先量为 <strong>2.07×–2.23×</strong>（表 4）。</li>
+<li><strong>动作表示是有效杠杆。</strong> 在 <code>act_delta</code> 线上，相对动作在真留出集上较绝对动作提升
+   <strong>1.83×</strong>（0.08417 vs 0.15379 rad），且在每一个 chunk 位置 k 上均更优（表 27、28）。</li>
+<li><strong>两条独立证据链共同指向"增加训练步数买到的是记忆而非泛化"。</strong>
+   <code>act_delta</code> 的后 100k 步留出误差变化 +0.4%（表 27）；<code>act_eef</code> 三条训练曲线一致在
+   50k–100k 触底后单调变差（表 7）。但真机结果在 <code>act_eef</code> 上与该结论方向相反（200k 优于 100k，3/3 同向，p = 0.168），
+   说明"离线留出误差"与"真机成功率"是两个不同的量，可同时成立。</li>
+<li><strong>部署链路改写的量级超过全部架构改动。</strong> K = 40 三次 Hermite 桥单级即造成 +5.1%–+7.8% 的 MAE 代价（表 5），
+   而部署栈其余四级合计仅 −0.6%–−1.2%（轻微改善）。在 <code>chunk</code> 模式下 <code>n &lt; 40</code> 时该桥存在硬编码缺陷，
+   使任意权重均无法前进（§5.4）。</li>
+</ol>
+<p><strong>统一建议</strong>：以 <code>replan_1</code> 归约下的末端位置误差与 <code>ens_&lt;在用系数&gt;</code> 归约下的二阶差分作为离线主排序键，
+弃用平坦 14 维 MAE；保持 <code>temporal_ensemble_coeff = 0.01</code>；部署权重自 <code>acteef_533</code> 换至 616 系。</p>
+<hr />
+<div class="toc"><span class="toctitle">目录</span><ul>
+<li><a href="#_1">摘要</a></li>
+<li><a href="#1">1. 实验设置</a><ul>
+<li><a href="#11">1.1 两条策略线的共同与差异</a></li>
+<li><a href="#12">1.2 评测集与空基线</a></li>
+<li><a href="#13">1.3 三把不可混用的尺子</a></li>
+<li><a href="#14">1.4 原始报告索引</a></li>
+</ul>
+</li>
+<li><a href="#2-act_eef">2. act_eef 线：权重与训练数据</a><ul>
+<li><a href="#21">2.1 权重清单</a></li>
+<li><a href="#22">2.2 训练集之间不是包含关系</a></li>
+</ul>
+</li>
+<li><a href="#3-act_eef-chunk-horizon-60">3. act_eef 离线结果（一）：chunk 口径，horizon 60</a><ul>
+<li><a href="#31">3.1 策略原始输出</a></li>
+<li><a href="#32">3.2 部署改写后</a></li>
+<li><a href="#33">3.3 物理量分组</a></li>
+<li><a href="#34">3.4 训练步曲线与噪声尺</a></li>
+<li><a href="#35-616-67">3.5 配方替换的代价：616 放弃的 67 集</a></li>
+<li><a href="#36">3.6 跨架构同尺比较</a></li>
+</ul>
+</li>
+<li><a href="#4-act_eef-horizon-1">4. act_eef 离线结果（二）：时序集成口径，horizon 1</a><ul>
+<li><a href="#41">4.1 六种归约的定义</a></li>
+<li><a href="#42">4.2 主表</a></li>
+<li><a href="#43">4.3 三个可分离机制的量化</a></li>
+<li><a href="#44-mae">4.4 平坦 MAE 的构成分析</a></li>
+</ul>
+</li>
+<li><a href="#5-act_eef">5. act_eef 真机结果与离线—真机对照</a><ul>
+<li><a href="#51">5.1 真机成功率</a></li>
+<li><a href="#52">5.2 时序集成系数的几何</a></li>
+<li><a href="#53">5.3 离线—真机对照</a></li>
+<li><a href="#54">5.4 离线预测的成绩单</a></li>
+<li><a href="#55-acteef_505">5.5 acteef_505 的倒挂</a></li>
+<li><a href="#56-chunk-n-40">5.6 chunk 模式在 n &lt; 40 时的硬编码缺陷</a></li>
+</ul>
+</li>
+<li><a href="#6-act">6. act 线结果（一）：架构深度</a><ul>
+<li><a href="#61-decoder">6.1 三方实现对照与 decoder 输出索引缺陷</a></li>
+<li><a href="#62">6.2 层数扫描实测</a></li>
+</ul>
+</li>
+<li><a href="#7-act-act_delta">7. act 线结果（二）：动作表示（act_delta）</a><ul>
+<li><a href="#71">7.1 第一轮：自变量为空</a></li>
+<li><a href="#72">7.2 留出集泛化差距（核心结果）</a></li>
+<li><a href="#73-chunk">7.3 相对化的方差增益沿 chunk 分布不均</a></li>
+<li><a href="#74">7.4 视觉依赖的左右不对称</a></li>
+<li><a href="#75">7.5 真机日志诊断</a></li>
+</ul>
+</li>
+<li><a href="#8-act">8. act 线结果（三）：失败/纠错数据消融</a><ul>
+<li><a href="#81">8.1 数据与训练</a></li>
+<li><a href="#82">8.2 主表</a></li>
+<li><a href="#83">8.3 伤害机制</a></li>
+</ul>
+</li>
+<li><a href="#9">9. 跨线综合讨论</a><ul>
+<li><a href="#91">9.1 有效与无效的杠杆</a></li>
+<li><a href="#92">9.2 记忆与泛化的分离</a></li>
+<li><a href="#93">9.3 离线指标的效度分层</a></li>
+</ul>
+</li>
+<li><a href="#10">10. 效度威胁与未测项</a><ul>
+<li><a href="#101">10.1 效度威胁（按严重度）</a></li>
+<li><a href="#102">10.2 明确未测（不得当作已测）</a></li>
+</ul>
+</li>
+<li><a href="#11_1">11. 建议</a><ul>
+<li><a href="#111">11.1 立即可做（零训练成本）</a></li>
+<li><a href="#112">11.2 部署配置</a></li>
+<li><a href="#113">11.3 评测方法论</a></li>
+<li><a href="#114">11.4 训练侧</a></li>
+</ul>
+</li>
+<li><a href="#a">附录 A 指标定义</a></li>
+<li><a href="#b">附录 B 空基线定义</a></li>
+<li><a href="#c">附录 C 复现入口</a></li>
+</ul>
+</div>
+
+<h2 id="1">1. 实验设置</h2>
+<h3 id="11">1.1 两条策略线的共同与差异</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>act</code> / <code>act_delta</code> 线</th>
+<th><code>act_eef</code> 线</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>动作空间</td>
+<td>16 维关节角（14 臂 + 2 夹爪），单位 rad</td>
+<td>14 维末端位姿（12 位姿 + 2 夹爪），位姿为 m / rad</td>
+</tr>
+<tr>
+<td>骨干</td>
+<td>ResNet-18（三相机共享）</td>
+<td>ResNet-18（三相机共享）</td>
+</tr>
+<tr>
+<td>Transformer</td>
+<td><code>d_model</code> 512 / <code>ff</code> 3200 / enc 4 层</td>
+<td>同左；dec 1 层</td>
+</tr>
+<tr>
+<td>chunk</td>
+<td>100</td>
+<td>100</td>
+</tr>
+<tr>
+<td>VAE</td>
+<td>开，<code>latent_dim</code> 32，<code>kl_weight</code> 10.0</td>
+<td>开</td>
+</tr>
+<tr>
+<td>相机</td>
+<td>top / wrist_L / wrist_R，480×640</td>
+<td>同左</td>
+</tr>
+<tr>
+<td>学习率</td>
+<td>1e-5 恒定，无 scheduler</td>
+<td>1e-5 恒定</td>
+</tr>
+<tr>
+<td>训练步 / seed / batch</td>
+<td>200k（部分 250k）/ — / 16</td>
+<td>200000 / 1000 / 16，五份逐字段相同</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>act_eef</code> 五份权重的 <code>config.json</code> 逐字段相同，<strong>唯一变量是训练数据</strong>
+（来源：<code>616-baseline</code> <code>probes/provenance.txt</code> §3）。这是本报告中归因最干净的一组对照。</p>
+<h3 id="12">1.2 评测集与空基线</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>评测集</td>
+<td><code>tidy_up_stationery_le/batch_success_53_eval_data_eef</code></td>
+</tr>
+<tr>
+<td>规模</td>
+<td>53 episode / 40 132 帧</td>
+</tr>
+<tr>
+<td>anchor（09-06 轮）</td>
+<td>stride 20，2 007 个；有效动作步 115 737 @h60、97 090 @h50</td>
+</tr>
+<tr>
+<td>采样（09-07 轮）</td>
+<td>逐帧全取 40 132 个（时序集成需要连续帧）</td>
+</tr>
+<tr>
+<td>污染</td>
+<td>19 次 <code>act_eef</code> 评测的 <code>episodes_dropped_as_contaminated</code> 全部为 0</td>
+</tr>
+<tr>
+<td>硬件</td>
+<td>RTX 4090，<code>/opt/robot-platform/train-venv</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>空基线定义见附录 B。<code>hold_state</code> 表示"命令 = 当前实测位姿"，<code>train_mean</code> 表示"命令 = 训练集动作均值"。</p>
+<h3 id="13">1.3 三把不可混用的尺子</h3>
+<p>三轮测试量的<strong>不是同一条链、不是同一个 horizon、不是同一批样本</strong>。跨轮次比较绝对值无效。</p>
+<p><strong>表 1｜三轮测试的对应关系</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>轮次</th>
+<th>度量的链路</th>
+<th style="text-align: right;">horizon</th>
+<th>样本</th>
+<th>对应真机模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09-06</td>
+<td><code>inference.type: chunk</code> + K=40 桥</td>
+<td style="text-align: right;">60（跨架构用 50）</td>
+<td>2 007 anchor</td>
+<td><strong>真机现不执行</strong></td>
+</tr>
+<tr>
+<td>09-07</td>
+<td><code>inference.type: sync</code> + <code>ACTTemporalEnsembler</code></td>
+<td style="text-align: right;"><strong>1</strong></td>
+<td>40 132 帧</td>
+<td><code>ens_&lt;coeff&gt;</code> 行 = 真机在跑的</td>
+</tr>
+<tr>
+<td>真机</td>
+<td>同上，实机闭环</td>
+<td style="text-align: right;">—</td>
+<td>30 次/格 × 16 格 = 480 次</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>09-06 轮 horizon 60 取自 <code>deploy_config_eef.yaml:90</code>。09-07 轮证明该字段在 <code>type: sync</code> 下不生效
+（<code>deploy.py:590-595</code> 仅在 <code>type == chunk</code> 分支传递，<code>SyncInferenceConfig</code> 无此字段），
+因此 09-06 轮的 <code>policy_deployed</code> 一列描述的是一条真机在时序集成模式下不执行的通路（§5.3）。</p>
+<h3 id="14">1.4 原始报告索引</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>报告</th>
+<th>日期</th>
+<th>覆盖内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><code>ACT-layer-depth-analysis.md</code></td>
+<td>08-10</td>
+<td>编解码器深度实测、<code>[0]</code>/<code>[-1]</code> 缺陷</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><code>ACT-improvement-proposals-2026.md</code></td>
+<td>08-10</td>
+<td>改进方向（计划，非结果）</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><code>ACT-experiment-plan-2026-08.md</code></td>
+<td>08-11</td>
+<td>实验方案（计划，非结果）</td>
+</tr>
+<tr>
+<td>R4</td>
+<td><code>act_delta-batch5-failure-analysis-2026-08.md</code></td>
+<td>08-14</td>
+<td>相对动作未启用的根因审计</td>
+</tr>
+<tr>
+<td>R5</td>
+<td><code>act_delta-rel100-precision-analysis-2026-08.md</code></td>
+<td>08-15</td>
+<td>相对动作留出集评估</td>
+</tr>
+<tr>
+<td>R6</td>
+<td><code>failure-data-in-imitation-2026-08.md</code></td>
+<td>08-18</td>
+<td>失败/纠错数据三组消融</td>
+</tr>
+<tr>
+<td>R7</td>
+<td><code>act_eef-616-baseline-2026-09.md</code></td>
+<td>09-06</td>
+<td>五份 <code>act_eef</code> chunk 口径主表</td>
+</tr>
+<tr>
+<td>R8</td>
+<td><code>act_eef-temporal-ensembling-2026-09.md</code></td>
+<td>09-08</td>
+<td>时序集成口径逐帧评测</td>
+</tr>
+<tr>
+<td>R9</td>
+<td><code>act_eef-realrobot-vs-offline-2026-09.md</code></td>
+<td>09-08</td>
+<td>480 次真机对照离线</td>
+</tr>
+<tr>
+<td>R10</td>
+<td><code>act-camera-embedding.patch</code></td>
+<td>08-10</td>
+<td>相机身份嵌入补丁（未评测）</td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>../MASTER-LEDGER-2026-09.md</code></td>
+<td>09-08</td>
+<td>全局总账索引</td>
+</tr>
+</tbody>
+</table></div>
+<p>R2、R3 为前瞻性方案文档，不含实验结果，本报告仅在建议章节引用其变量定义。</p>
+<hr />
+<h2 id="2-act_eef">2. <code>act_eef</code> 线：权重与训练数据</h2>
+<h3 id="21">2.1 权重清单</h3>
+<p><strong>表 2｜五份 <code>act_eef</code> 权重</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>短名</th>
+<th>训练集</th>
+<th style="text-align: right;">episode 数</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acteef_361</code></td>
+<td><code>batch_success_361_eef</code></td>
+<td style="text-align: right;">363</td>
+<td>已评</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td><code>batch_success_505_eef</code></td>
+<td style="text-align: right;">505</td>
+<td>已评；唯一存中间步的早期基线</td>
+</tr>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td><code>batch_success_533_eef</code></td>
+<td style="text-align: right;">535</td>
+<td><strong><code>deploy_config_eef.yaml</code> 现役</strong></td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td><code>batch_success_616_eef</code></td>
+<td style="text-align: right;">616</td>
+<td>09-06 主体</td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td><code>batch_success_616_eef_actionsame</code></td>
+<td style="text-align: right;">616</td>
+<td>同分布第二次独立训练，用作噪声尺</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>acteef_616</code> 与 <code>acteef_616as</code> 的归一化统计量逐位相同（<code>action.count</code> 均为 506 646），
+<code>model.safetensors</code> 的 md5 不同，构成本报告全部"训练噪声"估计的基础。</p>
+<h3 id="22">2.2 训练集之间不是包含关系</h3>
+<p><strong>表 3｜训练集集合差 |A \ B|（velocity 指纹，行 A 列 B）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">361</th>
+<th style="text-align: right;">505</th>
+<th style="text-align: right;">533</th>
+<th style="text-align: right;">616</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>361</strong>（363）</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">49</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">49</td>
+</tr>
+<tr>
+<td><strong>505</strong>（505）</td>
+<td style="text-align: right;">191</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">37</td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr>
+<td><strong>533</strong>（535）</td>
+<td style="text-align: right;">172</td>
+<td style="text-align: right;">67</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;"><strong>67</strong></td>
+</tr>
+<tr>
+<td><strong>616</strong>（616）</td>
+<td style="text-align: right;">302</td>
+<td style="text-align: right;">111</td>
+<td style="text-align: right;">148</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table></div>
+<p>读法：<code>505_eef ⊂ 616_eef</code>、<code>361_eef ⊂ 533_eef</code>，但 <strong>533 有 67 集不在 616 中</strong>。
+因此 616 相对 533 不是"数据更多"，而是"换了配方"：616 = 505 + 111 集新数据 − 533 在 505 之上追加的 67 集。</p>
+<p><strong>越界率</strong>：以各自训练集 MIN_MAX 盒计，505 / 533 / 616 三个盒子对本评测集完全等价
+（越界 98 帧，占 0.24%，最大越界 0.0301，通道 <code>eef_r_x</code>）；361 为 156 帧 / 0.39%。
+<strong>权重之间的精度差异不能归因于归一化差异。</strong></p>
+<hr />
+<h2 id="3-act_eef-chunk-horizon-60">3. <code>act_eef</code> 离线结果（一）：chunk 口径，horizon 60</h2>
+<p>数据来源 R7，<code>eval_policy/runs/20260906_acteef_616_baseline/tables.md</code>。</p>
+<h3 id="31">3.1 策略原始输出</h3>
+<p><strong>表 4｜<code>policy_raw</code>（h60，2 007 anchor）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th>训练集</th>
+<th style="text-align: right;">MAE</th>
+<th style="text-align: right;">RMSE</th>
+<th style="text-align: right;">norm_mae</th>
+<th style="text-align: right;">@1</th>
+<th style="text-align: right;">@10</th>
+<th style="text-align: right;">@25</th>
+<th style="text-align: right;">@60</th>
+<th style="text-align: right;">vs <code>hold_state</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td>533（现役）</td>
+<td style="text-align: right;"><strong>0.03689</strong></td>
+<td style="text-align: right;">0.07867</td>
+<td style="text-align: right;">0.18406</td>
+<td style="text-align: right;">0.01694</td>
+<td style="text-align: right;">0.02129</td>
+<td style="text-align: right;">0.02713</td>
+<td style="text-align: right;">0.03689</td>
+<td style="text-align: right;"><strong>2.23×</strong></td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td>616_actionsame</td>
+<td style="text-align: right;">0.03781</td>
+<td style="text-align: right;">0.08248</td>
+<td style="text-align: right;">0.18513</td>
+<td style="text-align: right;">0.01729</td>
+<td style="text-align: right;">0.02182</td>
+<td style="text-align: right;">0.02759</td>
+<td style="text-align: right;">0.03781</td>
+<td style="text-align: right;">2.17×</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td>616</td>
+<td style="text-align: right;">0.03783</td>
+<td style="text-align: right;">0.08345</td>
+<td style="text-align: right;">0.18634</td>
+<td style="text-align: right;">0.01713</td>
+<td style="text-align: right;">0.02159</td>
+<td style="text-align: right;">0.02745</td>
+<td style="text-align: right;">0.03783</td>
+<td style="text-align: right;">2.17×</td>
+</tr>
+<tr>
+<td><code>acteef_361</code></td>
+<td>361</td>
+<td style="text-align: right;">0.03799</td>
+<td style="text-align: right;">0.07949</td>
+<td style="text-align: right;">0.18966</td>
+<td style="text-align: right;">0.01924</td>
+<td style="text-align: right;">0.02353</td>
+<td style="text-align: right;">0.02889</td>
+<td style="text-align: right;">0.03799</td>
+<td style="text-align: right;">2.16×</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td>505</td>
+<td style="text-align: right;">0.03961</td>
+<td style="text-align: right;">0.08481</td>
+<td style="text-align: right;">0.19499</td>
+<td style="text-align: right;">0.01814</td>
+<td style="text-align: right;">0.02273</td>
+<td style="text-align: right;">0.02892</td>
+<td style="text-align: right;">0.03961</td>
+<td style="text-align: right;">2.07×</td>
+</tr>
+<tr>
+<td><em>null</em> <code>hold_state</code></td>
+<td>—</td>
+<td style="text-align: right;">0.08216</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">1.00×</td>
+</tr>
+<tr>
+<td><em>null</em> <code>train_mean</code></td>
+<td>—</td>
+<td style="text-align: right;">0.22681</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="32">3.2 部署改写后</h3>
+<p><strong>表 5｜<code>policy_deployed</code>（h60）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;">MAE</th>
+<th style="text-align: right;">RMSE</th>
+<th style="text-align: right;">@1</th>
+<th style="text-align: right;">@25</th>
+<th style="text-align: right;">@60</th>
+<th style="text-align: right;">vs <code>hold_state</code></th>
+<th style="text-align: right;">重写代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td style="text-align: right;"><strong>0.03975</strong></td>
+<td style="text-align: right;">0.08788</td>
+<td style="text-align: right;">0.02174</td>
+<td style="text-align: right;">0.03430</td>
+<td style="text-align: right;">0.03975</td>
+<td style="text-align: right;"><strong>2.07×</strong></td>
+<td style="text-align: right;">+7.8%</td>
+</tr>
+<tr>
+<td><code>acteef_361</code></td>
+<td style="text-align: right;">0.04010</td>
+<td style="text-align: right;">0.08779</td>
+<td style="text-align: right;">0.02185</td>
+<td style="text-align: right;">0.03441</td>
+<td style="text-align: right;">0.04010</td>
+<td style="text-align: right;">2.05×</td>
+<td style="text-align: right;">+5.6%</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;">0.04067</td>
+<td style="text-align: right;">0.09185</td>
+<td style="text-align: right;">0.02181</td>
+<td style="text-align: right;">0.03444</td>
+<td style="text-align: right;">0.04067</td>
+<td style="text-align: right;">2.02×</td>
+<td style="text-align: right;">+7.5%</td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;">0.04069</td>
+<td style="text-align: right;">0.09113</td>
+<td style="text-align: right;">0.02181</td>
+<td style="text-align: right;">0.03456</td>
+<td style="text-align: right;">0.04069</td>
+<td style="text-align: right;">2.02×</td>
+<td style="text-align: right;">+7.6%</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;">0.04162</td>
+<td style="text-align: right;">0.09200</td>
+<td style="text-align: right;">0.02193</td>
+<td style="text-align: right;">0.03432</td>
+<td style="text-align: right;">0.04162</td>
+<td style="text-align: right;">1.97×</td>
+<td style="text-align: right;">+5.1%</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>逐级消融归因</strong>：<code>rollbacks</code> / <code>smoothing</code> / <code>excursions</code> 三级合计仅 −0.6%–−1.2%（轻微改善），
+<strong><code>filt_5_bridge</code> 单级即抬高 MAE +5.1%–+7.8%</strong>。全部部署代价来自 K = 40 的 Hermite 桥，且几乎与权重无关。</p>
+<h3 id="33">3.3 物理量分组</h3>
+<p>14 维动作不共享单位（12 维位姿为 m/rad，2 维夹爪为 [0,1]），平坦 MAE 是三种单位的平均。</p>
+<p><strong>表 6｜按物理维分组的误差</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;">位置 (mm)</th>
+<th style="text-align: right;">姿态 (deg)</th>
+<th style="text-align: right;">夹爪</th>
+<th style="text-align: right;">部署后位置 (mm)</th>
+<th style="text-align: right;">部署后姿态 (deg)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td style="text-align: right;"><strong>10.51</strong></td>
+<td style="text-align: right;"><strong>3.87</strong></td>
+<td style="text-align: right;">0.0243</td>
+<td style="text-align: right;"><strong>11.98</strong></td>
+<td style="text-align: right;"><strong>4.22</strong></td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;">10.56</td>
+<td style="text-align: right;">3.96</td>
+<td style="text-align: right;">0.0258</td>
+<td style="text-align: right;">12.09</td>
+<td style="text-align: right;">4.28</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;">10.68</td>
+<td style="text-align: right;">3.93</td>
+<td style="text-align: right;">0.0268</td>
+<td style="text-align: right;">12.16</td>
+<td style="text-align: right;">4.26</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;">10.95</td>
+<td style="text-align: right;">4.17</td>
+<td style="text-align: right;">0.0259</td>
+<td style="text-align: right;">12.19</td>
+<td style="text-align: right;">4.41</td>
+</tr>
+<tr>
+<td><code>acteef_361</code></td>
+<td style="text-align: right;">10.96</td>
+<td style="text-align: right;">4.00</td>
+<td style="text-align: right;">0.0234</td>
+<td style="text-align: right;">12.14</td>
+<td style="text-align: right;">4.27</td>
+</tr>
+<tr>
+<td><em>null</em> <code>hold_state</code></td>
+<td style="text-align: right;">26.53</td>
+<td style="text-align: right;">7.89</td>
+<td style="text-align: right;">0.0823</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table></div>
+<p>末端位姿（欧氏距离 / 四元数测地角）给出同一排序：533 为 21.27 mm、616as 为 21.29 mm、
+616 为 21.52 mm，<code>hold_state</code> 为 54.07 mm。<strong>权重间全部差距在 0.3 mm 量级。</strong></p>
+<h3 id="34">3.4 训练步曲线与噪声尺</h3>
+<p><strong>表 7｜训练步扫描（<code>policy_raw</code> MAE，粗体为行内最小值）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;">50 k</th>
+<th style="text-align: right;">100 k</th>
+<th style="text-align: right;">150 k</th>
+<th style="text-align: right;">200 k</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;">0.03692</td>
+<td style="text-align: right;"><strong>0.03655</strong></td>
+<td style="text-align: right;">0.03722</td>
+<td style="text-align: right;">0.03783</td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;">0.03709</td>
+<td style="text-align: right;"><strong>0.03642</strong></td>
+<td style="text-align: right;">0.03794</td>
+<td style="text-align: right;">0.03781</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;"><strong>0.03859</strong></td>
+<td style="text-align: right;">0.03972</td>
+<td style="text-align: right;">0.03927</td>
+<td style="text-align: right;">0.03961</td>
+</tr>
+</tbody>
+</table></div>
+<p>三条曲线一致地在 50k–100k 触底后单调变差。<code>acteef_533</code> 与 <code>acteef_361</code> 的 job 仅存 200000，
+<strong>其训练曲线不存在且不可补测</strong>。</p>
+<p><strong>表 8｜孪生权重分歧（训练噪声下界）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>训练步</th>
+<th style="text-align: right;"><code>acteef_616</code></th>
+<th style="text-align: right;"><code>acteef_616as</code></th>
+<th style="text-align: right;">分歧（raw）</th>
+<th style="text-align: right;">分歧（部署后）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>50 k</td>
+<td style="text-align: right;">0.03692</td>
+<td style="text-align: right;">0.03709</td>
+<td style="text-align: right;">0.46%</td>
+<td style="text-align: right;">0.28%</td>
+</tr>
+<tr>
+<td>100 k</td>
+<td style="text-align: right;">0.03655</td>
+<td style="text-align: right;">0.03642</td>
+<td style="text-align: right;">0.35%</td>
+<td style="text-align: right;">0.43%</td>
+</tr>
+<tr>
+<td><strong>150 k</strong></td>
+<td style="text-align: right;">0.03722</td>
+<td style="text-align: right;">0.03794</td>
+<td style="text-align: right;"><strong>1.93%</strong></td>
+<td style="text-align: right;">0.93%</td>
+</tr>
+<tr>
+<td>200 k</td>
+<td style="text-align: right;">0.03783</td>
+<td style="text-align: right;">0.03781</td>
+<td style="text-align: right;">0.06%</td>
+<td style="text-align: right;">0.06%</td>
+</tr>
+</tbody>
+</table></div>
+<p>最大分歧 1.93%。该尺仅约束"固定 seed 下的训练不确定性"，是真实噪声的<strong>下界</strong>。
+表 4 中 616 与 533 的 2.5% 差距仅高出该下界 0.6 个百分点。</p>
+<h3 id="35-616-67">3.5 配方替换的代价：616 放弃的 67 集</h3>
+<p>在 533 独有、616 从未见过的 67 集上单独评测（2 814 anchor / 163 344 动作步）：</p>
+<p><strong>表 9｜67 集留出评测</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th>见过？</th>
+<th style="text-align: right;">MAE</th>
+<th style="text-align: right;">位置 (mm)</th>
+<th style="text-align: right;">姿态 (deg)</th>
+<th style="text-align: right;">acc@0.25σ</th>
+<th style="text-align: right;">vs <code>hold_state</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acteef_533</code></td>
+<td>是（训练过）</td>
+<td style="text-align: right;">0.01031</td>
+<td style="text-align: right;">3.38</td>
+<td style="text-align: right;">1.02</td>
+<td style="text-align: right;">0.984</td>
+<td style="text-align: right;">7.23×</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td>否</td>
+<td style="text-align: right;"><strong>0.03175</strong></td>
+<td style="text-align: right;"><strong>9.66</strong></td>
+<td style="text-align: right;">3.25</td>
+<td style="text-align: right;">0.817</td>
+<td style="text-align: right;"><strong>2.35×</strong></td>
+</tr>
+<tr>
+<td><em>null</em> <code>hold_state</code></td>
+<td>—</td>
+<td style="text-align: right;">0.07453</td>
+<td style="text-align: right;">24.13</td>
+<td style="text-align: right;">7.23</td>
+<td style="text-align: right;">0.626</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table></div>
+<p>533 一行是记忆读数，不构成公平比较。有意义的是：<strong>616 在从未见过的 67 集上（0.03175 / 9.66 mm）
+优于其在正式评测集上的表现（0.03783 / 10.68 mm）</strong>，说明放弃这 67 集不构成分布风险。</p>
+<h3 id="36">3.6 跨架构同尺比较</h3>
+<p>patch 系列 <code>action_chunk_size</code> 为 50，跨架构比较必须在 h50 进行。</p>
+<p><strong>表 10｜h50 跨架构（chunk 口径）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;"><code>policy_raw</code></th>
+<th style="text-align: right;"><code>policy_deployed</code></th>
+<th style="text-align: right;">推理耗时（同评测全程）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pp_old</code>（diffusion，DDPM 100 步）</td>
+<td style="text-align: right;"><strong>0.03417</strong></td>
+<td style="text-align: right;">0.03955</td>
+<td style="text-align: right;">442 s</td>
+</tr>
+<tr>
+<td><code>pp_new</code>（flow，10 步 Euler）</td>
+<td style="text-align: right;">0.03462</td>
+<td style="text-align: right;">0.03897</td>
+<td style="text-align: right;">89 s</td>
+</tr>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td style="text-align: right;">0.03443</td>
+<td style="text-align: right;"><strong>0.03794</strong></td>
+<td style="text-align: right;"><strong>17 s</strong></td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;">0.03511</td>
+<td style="text-align: right;">0.03854</td>
+<td style="text-align: right;">17 s</td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;">0.03514</td>
+<td style="text-align: right;">0.03862</td>
+<td style="text-align: right;">17 s</td>
+</tr>
+<tr>
+<td><code>acteef_361</code></td>
+<td style="text-align: right;">0.03568</td>
+<td style="text-align: right;">0.03827</td>
+<td style="text-align: right;">17 s</td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;">0.03689</td>
+<td style="text-align: right;">0.03935</td>
+<td style="text-align: right;">16 s</td>
+</tr>
+</tbody>
+</table></div>
+<p>在部署链上五份 <code>act_eef</code> 中有四份优于两份 patch 权重，且推理快 5–26 倍。
+推理耗时是硬测量，不受 §7 的指标效度问题影响；MAE 排序则受影响（§7.3）。</p>
+<hr />
+<h2 id="4-act_eef-horizon-1">4. <code>act_eef</code> 离线结果（二）：时序集成口径，horizon 1</h2>
+<p>数据来源 R8，<code>eval_policy/runs/20260908_temporal_ensembling/</code>。
+本轮驱动的是从 lerobot 直接 import 的 <code>ACTTemporalEnsembler</code>（非重写实现），
+每帧 <code>update</code>、episode 边界 <code>reset</code>，与机器人上 <code>policy.reset()</code> 时机一致。</p>
+<h3 id="41">4.1 六种归约的定义</h3>
+<p><strong>表 11｜归约变体字典</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>变体</th>
+<th>定义</th>
+<th>真机是否执行</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>replan_1</code></td>
+<td><code>A_t[0]</code>。每 tick 重规划、不平均、不建桥。<strong>无滞后的能力代理</strong></td>
+<td>否（等价于 <code>n_action_steps=1</code> 且关闭 TE）</td>
+</tr>
+<tr>
+<td><code>ens_&lt;coeff&gt;</code></td>
+<td>真实 <code>ACTTemporalEnsembler</code>，三个系数</td>
+<td><strong>是——真机执行的就是这一行</strong></td>
+</tr>
+<tr>
+<td><code>chunk_raw</code></td>
+<td>chunk 模式重规划节奏（每 60 帧），原样执行</td>
+<td>否</td>
+</tr>
+<tr>
+<td><code>chunk_deploy</code></td>
+<td>同节奏 + 完整部署改写（回退删除 / 平滑 / K=40 桥 / 夹爪 clip）</td>
+<td>曾经是；TE 模式下不是</td>
+</tr>
+</tbody>
+</table></div>
+<p>三个可分离的差：<code>chunk_deploy − chunk_raw</code> = 桥；<code>chunk_raw − replan_1</code> = 重规划频率；
+<code>ens_* − replan_1</code> = 平均。</p>
+<h3 id="42">4.2 主表</h3>
+<p><strong>表 12｜TE 口径全表（horizon 1，逐帧 40 132 样本）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th>变体</th>
+<th style="text-align: right;">MAE</th>
+<th style="text-align: right;">RMSE</th>
+<th style="text-align: right;">acc@0.25σ</th>
+<th style="text-align: right;">位置 (mm)</th>
+<th style="text-align: right;">姿态 (deg)</th>
+<th style="text-align: right;">二阶差分</th>
+<th style="text-align: right;">×demo</th>
+<th style="text-align: right;">真机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>acteef_533</code></strong></td>
+<td><code>replan_1</code></td>
+<td style="text-align: right;">0.01688</td>
+<td style="text-align: right;">0.03273</td>
+<td style="text-align: right;">0.937</td>
+<td style="text-align: right;">9.52</td>
+<td style="text-align: right;">3.02</td>
+<td style="text-align: right;">0.002960</td>
+<td style="text-align: right;">4.13</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_-0.05</code></td>
+<td style="text-align: right;">0.02736</td>
+<td style="text-align: right;">0.05485</td>
+<td style="text-align: right;">0.837</td>
+<td style="text-align: right;">14.85</td>
+<td style="text-align: right;">4.97</td>
+<td style="text-align: right;">0.000264</td>
+<td style="text-align: right;">0.37</td>
+<td style="text-align: right;">n/a</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_0</code></td>
+<td style="text-align: right;">0.04041</td>
+<td style="text-align: right;">0.08077</td>
+<td style="text-align: right;">0.727</td>
+<td style="text-align: right;">22.45</td>
+<td style="text-align: right;">7.48</td>
+<td style="text-align: right;">0.000211</td>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;">n/a</td>
+</tr>
+<tr>
+<td></td>
+<td><strong><code>ens_0.01</code></strong></td>
+<td style="text-align: right;">0.04391</td>
+<td style="text-align: right;">0.08814</td>
+<td style="text-align: right;">0.702</td>
+<td style="text-align: right;">24.71</td>
+<td style="text-align: right;">8.14</td>
+<td style="text-align: right;">0.000224</td>
+<td style="text-align: right;">0.31</td>
+<td style="text-align: right;"><strong>60%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_raw</code></td>
+<td style="text-align: right;">0.03593</td>
+<td style="text-align: right;">0.07689</td>
+<td style="text-align: right;">0.767</td>
+<td style="text-align: right;">20.74</td>
+<td style="text-align: right;">6.48</td>
+<td style="text-align: right;">0.002534</td>
+<td style="text-align: right;">3.54</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_deploy</code></td>
+<td style="text-align: right;">0.03850</td>
+<td style="text-align: right;">0.08548</td>
+<td style="text-align: right;">0.742</td>
+<td style="text-align: right;">23.79</td>
+<td style="text-align: right;">6.81</td>
+<td style="text-align: right;">0.002144</td>
+<td style="text-align: right;">2.99</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><strong><code>acteef_616</code></strong></td>
+<td><code>replan_1</code></td>
+<td style="text-align: right;">0.01704</td>
+<td style="text-align: right;">0.03520</td>
+<td style="text-align: right;">0.938</td>
+<td style="text-align: right;"><strong>9.27</strong></td>
+<td style="text-align: right;">3.02</td>
+<td style="text-align: right;">0.002964</td>
+<td style="text-align: right;">4.14</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_-0.05</code></td>
+<td style="text-align: right;">0.02803</td>
+<td style="text-align: right;">0.05709</td>
+<td style="text-align: right;">0.832</td>
+<td style="text-align: right;">15.23</td>
+<td style="text-align: right;">5.00</td>
+<td style="text-align: right;">0.000256</td>
+<td style="text-align: right;">0.36</td>
+<td style="text-align: right;"><strong>50%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_0</code></td>
+<td style="text-align: right;">0.04250</td>
+<td style="text-align: right;">0.08716</td>
+<td style="text-align: right;">0.719</td>
+<td style="text-align: right;">23.60</td>
+<td style="text-align: right;">7.67</td>
+<td style="text-align: right;">0.000197</td>
+<td style="text-align: right;">0.28</td>
+<td style="text-align: right;">n/a</td>
+</tr>
+<tr>
+<td></td>
+<td><strong><code>ens_0.01</code></strong></td>
+<td style="text-align: right;">0.04638</td>
+<td style="text-align: right;">0.09574</td>
+<td style="text-align: right;">0.695</td>
+<td style="text-align: right;">25.96</td>
+<td style="text-align: right;">8.39</td>
+<td style="text-align: right;">0.000212</td>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_raw</code></td>
+<td style="text-align: right;">0.03689</td>
+<td style="text-align: right;">0.08129</td>
+<td style="text-align: right;">0.766</td>
+<td style="text-align: right;">21.06</td>
+<td style="text-align: right;">6.53</td>
+<td style="text-align: right;">0.002587</td>
+<td style="text-align: right;">3.61</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_deploy</code></td>
+<td style="text-align: right;">0.03936</td>
+<td style="text-align: right;">0.08920</td>
+<td style="text-align: right;">0.742</td>
+<td style="text-align: right;">23.98</td>
+<td style="text-align: right;">6.81</td>
+<td style="text-align: right;">0.002155</td>
+<td style="text-align: right;">3.01</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><strong><code>acteef_616as</code></strong></td>
+<td><code>replan_1</code></td>
+<td style="text-align: right;">0.01722</td>
+<td style="text-align: right;">0.03555</td>
+<td style="text-align: right;">0.937</td>
+<td style="text-align: right;"><strong>9.27</strong></td>
+<td style="text-align: right;">3.05</td>
+<td style="text-align: right;">0.003001</td>
+<td style="text-align: right;">4.19</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_-0.05</code></td>
+<td style="text-align: right;">0.02817</td>
+<td style="text-align: right;">0.05726</td>
+<td style="text-align: right;">0.833</td>
+<td style="text-align: right;">14.98</td>
+<td style="text-align: right;">5.03</td>
+<td style="text-align: right;">0.000256</td>
+<td style="text-align: right;">0.36</td>
+<td style="text-align: right;"><strong>50%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_0</code></td>
+<td style="text-align: right;">0.04243</td>
+<td style="text-align: right;">0.08667</td>
+<td style="text-align: right;">0.721</td>
+<td style="text-align: right;">23.30</td>
+<td style="text-align: right;">7.69</td>
+<td style="text-align: right;"><strong>0.000195</strong></td>
+<td style="text-align: right;"><strong>0.27</strong></td>
+<td style="text-align: right;">n/a</td>
+</tr>
+<tr>
+<td></td>
+<td><strong><code>ens_0.01</code></strong></td>
+<td style="text-align: right;">0.04626</td>
+<td style="text-align: right;">0.09522</td>
+<td style="text-align: right;">0.698</td>
+<td style="text-align: right;">25.64</td>
+<td style="text-align: right;">8.39</td>
+<td style="text-align: right;">0.000210</td>
+<td style="text-align: right;">0.29</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_raw</code></td>
+<td style="text-align: right;">0.03680</td>
+<td style="text-align: right;">0.08040</td>
+<td style="text-align: right;">0.766</td>
+<td style="text-align: right;">20.82</td>
+<td style="text-align: right;">6.53</td>
+<td style="text-align: right;">0.002553</td>
+<td style="text-align: right;">3.56</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_deploy</code></td>
+<td style="text-align: right;">0.03935</td>
+<td style="text-align: right;">0.08851</td>
+<td style="text-align: right;">0.742</td>
+<td style="text-align: right;">23.88</td>
+<td style="text-align: right;">6.83</td>
+<td style="text-align: right;">0.002144</td>
+<td style="text-align: right;">2.99</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><code>base</code>（patch）</td>
+<td><code>replan_1</code></td>
+<td style="text-align: right;"><strong>0.01647</strong></td>
+<td style="text-align: right;">0.03269</td>
+<td style="text-align: right;">0.943</td>
+<td style="text-align: right;">9.85</td>
+<td style="text-align: right;">2.90</td>
+<td style="text-align: right;">0.011587</td>
+<td style="text-align: right;"><strong>16.18</strong></td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_0.01</code></td>
+<td style="text-align: right;"><strong>0.03159</strong></td>
+<td style="text-align: right;">0.06590</td>
+<td style="text-align: right;">0.805</td>
+<td style="text-align: right;">18.41</td>
+<td style="text-align: right;">5.65</td>
+<td style="text-align: right;">0.001181</td>
+<td style="text-align: right;">1.65</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_deploy</code></td>
+<td style="text-align: right;">0.03755</td>
+<td style="text-align: right;">0.08510</td>
+<td style="text-align: right;">0.749</td>
+<td style="text-align: right;">24.48</td>
+<td style="text-align: right;">6.46</td>
+<td style="text-align: right;">0.002658</td>
+<td style="text-align: right;">3.71</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><code>depth1</code>（patch）</td>
+<td><code>replan_1</code></td>
+<td style="text-align: right;"><strong>0.01644</strong></td>
+<td style="text-align: right;">0.03465</td>
+<td style="text-align: right;"><strong>0.950</strong></td>
+<td style="text-align: right;">9.41</td>
+<td style="text-align: right;">2.84</td>
+<td style="text-align: right;">0.014060</td>
+<td style="text-align: right;"><strong>19.63</strong></td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ens_0.01</code></td>
+<td style="text-align: right;"><strong>0.02980</strong></td>
+<td style="text-align: right;">0.06020</td>
+<td style="text-align: right;">0.816</td>
+<td style="text-align: right;">17.71</td>
+<td style="text-align: right;">5.48</td>
+<td style="text-align: right;">0.001652</td>
+<td style="text-align: right;">2.31</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td></td>
+<td><code>chunk_deploy</code></td>
+<td style="text-align: right;"><strong>0.03733</strong></td>
+<td style="text-align: right;">0.08334</td>
+<td style="text-align: right;">0.753</td>
+<td style="text-align: right;">24.04</td>
+<td style="text-align: right;">6.52</td>
+<td style="text-align: right;">0.002956</td>
+<td style="text-align: right;">4.13</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><em>null</em> <code>hold_state</code></td>
+<td>—</td>
+<td style="text-align: right;">0.02091</td>
+<td style="text-align: right;">0.07177</td>
+<td style="text-align: right;">0.900</td>
+<td style="text-align: right;">12.65</td>
+<td style="text-align: right;">3.17</td>
+<td style="text-align: right;">0.000966</td>
+<td style="text-align: right;">1.35</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><em>null</em> <code>train_mean</code></td>
+<td>—</td>
+<td style="text-align: right;">0.22573</td>
+<td style="text-align: right;">0.33098</td>
+<td style="text-align: right;">0.138</td>
+<td style="text-align: right;">87.20</td>
+<td style="text-align: right;">38.50</td>
+<td style="text-align: right;">0.000000</td>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><em>参照</em> 人类示教</td>
+<td>—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.000716</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>ens_0</code> 一行与 <code>acteef_616</code> 的 <code>chunk_*</code> 两格系 R9 自原始 json 补出，R8 未印。</p>
+<p><strong>关键观察</strong>：全部时序集成变体的 MAE 均劣于空基线 <code>hold_state</code>，<code>ens_0.01</code> 劣至 <strong>0.48×</strong>；
+同时其二阶差分被压至 <code>replan_1</code> 的 1/13，<strong>比人类示教本身还平滑 3 倍</strong>（0.31× demo）。
+一个同时给出"比不动还差一倍"与"90% 真机成功率"的读数，量的不是能力而是滞后（§5.2）。</p>
+<h3 id="43">4.3 三个可分离机制的量化</h3>
+<p><strong>表 13｜同一批 chunk 的三种归约之差</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">533</th>
+<th style="text-align: right;">616</th>
+<th style="text-align: right;">616as</th>
+<th style="text-align: right;">base</th>
+<th style="text-align: right;">depth1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>重规划频率（<code>chunk_raw</code>÷<code>replan_1</code>，MAE）</td>
+<td style="text-align: right;">2.13×</td>
+<td style="text-align: right;">2.17×</td>
+<td style="text-align: right;">2.14×</td>
+<td style="text-align: right;">2.03×</td>
+<td style="text-align: right;">2.00×</td>
+</tr>
+<tr>
+<td>K=40 桥的代价（<code>chunk_deploy</code>÷<code>chunk_raw</code>，MAE）</td>
+<td style="text-align: right;">+7.1%</td>
+<td style="text-align: right;">+6.7%</td>
+<td style="text-align: right;">+6.9%</td>
+<td style="text-align: right;"><strong>+12.4%</strong></td>
+<td style="text-align: right;"><strong>+13.5%</strong></td>
+</tr>
+<tr>
+<td>K=40 桥的收益（同上，二阶差分）</td>
+<td style="text-align: right;">−15%</td>
+<td style="text-align: right;">−17%</td>
+<td style="text-align: right;">−16%</td>
+<td style="text-align: right;"><strong>−67%</strong></td>
+<td style="text-align: right;"><strong>−73%</strong></td>
+</tr>
+<tr>
+<td>时序集成的代价（<code>ens_0.01</code>÷<code>replan_1</code>，MAE）</td>
+<td style="text-align: right;">2.60×</td>
+<td style="text-align: right;">2.72×</td>
+<td style="text-align: right;">2.69×</td>
+<td style="text-align: right;">1.92×</td>
+<td style="text-align: right;">1.81×</td>
+</tr>
+<tr>
+<td>时序集成的收益（同上，二阶差分）</td>
+<td style="text-align: right;">1/13.2</td>
+<td style="text-align: right;">1/14.0</td>
+<td style="text-align: right;">1/14.3</td>
+<td style="text-align: right;">1/9.8</td>
+<td style="text-align: right;">1/8.5</td>
+</tr>
+<tr>
+<td>plan consistency（lag ≤ 1，不使用 GT）</td>
+<td style="text-align: right;"><strong>0.00266</strong></td>
+<td style="text-align: right;">0.00269</td>
+<td style="text-align: right;">0.00271</td>
+<td style="text-align: right;">0.00706</td>
+<td style="text-align: right;">0.00821</td>
+</tr>
+</tbody>
+</table></div>
+<p>三条读数：（i）每 60 帧重规划一次的代价为 2.1 倍误差，是 chunk 模式最大的单项成本，
+超过桥与任何架构差异，且五份权重高度一致；（ii）<strong>同一座 K=40 桥对 <code>act_eef</code> 是净损失
+（+7% MAE 换 −15% 抖动），对 patch 是净收益（+13% 换 −70%）</strong>——桥是给抖动策略用的平滑器，
+而 <code>act_eef</code> 的原始 chunk 本就不抖；（iii）结合真机结果，"时序集成的代价"一栏应读作<strong>价格而非损失</strong>（§7.2）。</p>
+<h3 id="44-mae">4.4 平坦 MAE 的构成分析</h3>
+<p><strong>表 14｜<code>replan_1</code> 逐维 MAE（14 维 EEF 动作空间）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th style="text-align: right;"><code>acteef_533</code></th>
+<th style="text-align: right;"><code>acteef_616</code></th>
+<th style="text-align: right;"><code>acteef_616as</code></th>
+<th style="text-align: right;">533 相对 616as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>eef_l_x</code></td>
+<td style="text-align: right;">0.00554</td>
+<td style="text-align: right;">0.00622</td>
+<td style="text-align: right;">0.00632</td>
+<td style="text-align: right;"><strong>−12.4%</strong></td>
+</tr>
+<tr>
+<td><code>eef_l_y</code></td>
+<td style="text-align: right;">0.00417</td>
+<td style="text-align: right;">0.00377</td>
+<td style="text-align: right;">0.00392</td>
+<td style="text-align: right;">+6.5%</td>
+</tr>
+<tr>
+<td><code>eef_l_z</code></td>
+<td style="text-align: right;">0.00386</td>
+<td style="text-align: right;">0.00364</td>
+<td style="text-align: right;">0.00364</td>
+<td style="text-align: right;">+6.2%</td>
+</tr>
+<tr>
+<td><code>eef_l_roll</code></td>
+<td style="text-align: right;">0.04026</td>
+<td style="text-align: right;">0.04168</td>
+<td style="text-align: right;">0.04260</td>
+<td style="text-align: right;">−5.5%</td>
+</tr>
+<tr>
+<td><code>eef_l_pitch</code></td>
+<td style="text-align: right;">0.02254</td>
+<td style="text-align: right;">0.02386</td>
+<td style="text-align: right;">0.02454</td>
+<td style="text-align: right;">−8.2%</td>
+</tr>
+<tr>
+<td><code>eef_l_yaw</code></td>
+<td style="text-align: right;">0.04377</td>
+<td style="text-align: right;">0.04657</td>
+<td style="text-align: right;">0.04938</td>
+<td style="text-align: right;"><strong>−11.4%</strong></td>
+</tr>
+<tr>
+<td><code>eef_r_x</code></td>
+<td style="text-align: right;">0.00474</td>
+<td style="text-align: right;">0.00444</td>
+<td style="text-align: right;">0.00450</td>
+<td style="text-align: right;">+5.3%</td>
+</tr>
+<tr>
+<td><code>eef_r_y</code></td>
+<td style="text-align: right;">0.00536</td>
+<td style="text-align: right;">0.00505</td>
+<td style="text-align: right;">0.00503</td>
+<td style="text-align: right;">+6.5%</td>
+</tr>
+<tr>
+<td><code>eef_r_z</code></td>
+<td style="text-align: right;">0.00460</td>
+<td style="text-align: right;">0.00417</td>
+<td style="text-align: right;">0.00389</td>
+<td style="text-align: right;"><strong>+18.2%</strong></td>
+</tr>
+<tr>
+<td><code>eef_r_roll</code></td>
+<td style="text-align: right;">0.03214</td>
+<td style="text-align: right;">0.03210</td>
+<td style="text-align: right;">0.03262</td>
+<td style="text-align: right;">−1.5%</td>
+</tr>
+<tr>
+<td><code>eef_r_pitch</code></td>
+<td style="text-align: right;">0.02843</td>
+<td style="text-align: right;">0.02493</td>
+<td style="text-align: right;">0.02445</td>
+<td style="text-align: right;"><strong>+16.3%</strong></td>
+</tr>
+<tr>
+<td><code>eef_r_yaw</code></td>
+<td style="text-align: right;">0.02557</td>
+<td style="text-align: right;">0.02708</td>
+<td style="text-align: right;">0.02598</td>
+<td style="text-align: right;">−1.6%</td>
+</tr>
+<tr>
+<td><code>gripper_L</code></td>
+<td style="text-align: right;">0.00747</td>
+<td style="text-align: right;">0.00773</td>
+<td style="text-align: right;">0.00759</td>
+<td style="text-align: right;">−1.5%</td>
+</tr>
+<tr>
+<td><strong><code>gripper_R</code></strong></td>
+<td style="text-align: right;">0.00793</td>
+<td style="text-align: right;">0.00727</td>
+<td style="text-align: right;">0.00669</td>
+<td style="text-align: right;"><strong>+18.5%</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>（a）尺度失衡。</strong> 6 个姿态维在 0.024–0.049 rad，6 个位置维在 0.0036–0.0063 m。
+无权重的 14 维平均中，<strong>姿态维的实际权重是位置维的 5–10 倍</strong>。表 4 中
+<code>0.03783 vs 0.03689</code> 的差距绝大部分来自左腕的 yaw / roll / pitch。</p>
+<p><strong>（b）信息量失衡。</strong> 相对空基线：末端位置 9.52 mm vs 12.65 mm（<strong>1.33×</strong>），
+末端姿态 0.0527 rad vs 0.0553 rad（<strong>1.05×</strong>）。
+<strong>主导平坦 MAE 的那组维度，正是策略相对"照抄当前位姿"几乎没有优势的维度。</strong></p>
+<p>两者合起来给出本报告的核心方法论结论：<strong>平坦 14 维 MAE 在本动作空间中近似是一个
+"左腕姿态指标"，不应作为主排序键。</strong></p>
+<hr />
+<h2 id="5-act_eef">5. <code>act_eef</code> 真机结果与离线—真机对照</h2>
+<p>数据来源 R9。真机数据由使用者提供，本报告及 R9 均未独立复核。</p>
+<h3 id="51">5.1 真机成功率</h3>
+<p>4 份权重 × 每格 30 次试验，16 个非空格，<strong>合计 480 次试验</strong>。</p>
+<p><strong>表 15｜真机成功率（%）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;">200k @ coeff 0.01</th>
+<th style="text-align: right;">100k @ coeff 0.01</th>
+<th style="text-align: right;">200k @ coeff −0.05</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;"><strong>80</strong></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">50</td>
+</tr>
+<tr>
+<td><code>acteef_533</code></td>
+<td style="text-align: right;">60</td>
+<td style="text-align: right;">—(a)</td>
+<td style="text-align: right;">n/a(b)</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;"><strong>80</strong></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">50</td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;"><strong>80</strong></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">50</td>
+</tr>
+</tbody>
+</table></div>
+<p>(a) <code>533_eef</code> 的 job 仅存 200000，100k checkpoint 不存在且不可补。
+(b) 该格可测但未跑。</p>
+<p><strong>表 16｜统计检验（Fisher 精确检验，双侧；Wilson 95% CI）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>比较</th>
+<th>计数</th>
+<th style="text-align: right;">p</th>
+<th>判读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>coeff 0.01 vs −0.05（合并 505/616/616as）</td>
+<td>72/90 vs 45/90</td>
+<td style="text-align: right;"><strong>4.0 × 10⁻⁵</strong></td>
+<td>定案</td>
+</tr>
+<tr>
+<td>coeff 0.01 vs −0.05（单份权重，×3）</td>
+<td>24/30 vs 15/30</td>
+<td style="text-align: right;">0.029</td>
+<td>三次独立复现</td>
+</tr>
+<tr>
+<td><code>533</code> vs 其余三份（200k @ 0.01）</td>
+<td>18/30 vs 72/90</td>
+<td style="text-align: right;"><strong>0.049</strong></td>
+<td>压线，方向可信</td>
+</tr>
+<tr>
+<td><code>533</code> vs 两份孪生（不含 505）</td>
+<td>18/30 vs 48/60</td>
+<td style="text-align: right;">0.075</td>
+<td>不足</td>
+</tr>
+<tr>
+<td><code>533</code> vs <code>616</code> 单挑</td>
+<td>18/30 vs 24/30</td>
+<td style="text-align: right;">0.158</td>
+<td>不足</td>
+</tr>
+<tr>
+<td>200k vs 100k（合并 ×3）</td>
+<td>72/90 vs 63/90</td>
+<td style="text-align: right;">0.168</td>
+<td>仅方向</td>
+</tr>
+<tr>
+<td><code>616</code> vs <code>616as</code>（孪生三格）</td>
+<td>24/24, 21/21, 15/15</td>
+<td style="text-align: right;">1.000</td>
+<td>分歧 = 0</td>
+</tr>
+</tbody>
+</table></div>
+<p>Wilson 95% CI（n = 30）：80% → [63, 90]；70% → [52, 83]；60% → [42, 75]；50% → [33, 67]。
+<strong>单格分辨力约 ±15 点</strong>；两格在 α = 0.05、power = 0.8 下需相差约 29 点方能分开。
+因此单格对单格的比较只能作方向读，除非在多份权重上重复。</p>
+<p>孪生权重三格全等（24/24、21/21、15/15）不应读作"真机噪声为零"——
+两个独立 Binom(30, 0.8) 恰好相等的概率约 13%。<strong>正确的读法是：训练种子噪声在真机上
+未大到能被 30 次试验看见，故表 15 中 ≥ 20 点的差别不太可能源于种子噪声。</strong></p>
+<h3 id="52">5.2 时序集成系数的几何</h3>
+<p><code>ACTTemporalEnsembler</code> 的权重为 <code>w_i = exp(−coeff · i)</code>，其中 <code>w_0</code> 对应<strong>最老</strong>的一次预测
+（<code>modeling_act.py:193-238</code>，docstring <code>:197-206</code>）。<code>chunk_size = 100</code>、30 fps 下：</p>
+<p><strong>表 17｜系数几何与真机结果</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th style="text-align: right;">coeff</th>
+<th style="text-align: right;">w(最新)/w(最老)</th>
+<th style="text-align: right;">加权平均滞后</th>
+<th style="text-align: right;">N_eff</th>
+<th style="text-align: right;">最新 10 次占权重</th>
+<th style="text-align: right;">离线 MAE (616as)</th>
+<th style="text-align: right;">离线二阶差分</th>
+<th style="text-align: right;">真机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><strong>+0.01</strong>（在用，ACT 原论文默认）</td>
+<td style="text-align: right;">0.37</td>
+<td style="text-align: right;">57.7 帧 = 1.92 s</td>
+<td style="text-align: right;"><strong>92.4</strong></td>
+<td style="text-align: right;">6.1%</td>
+<td style="text-align: right;">0.04626</td>
+<td style="text-align: right;">0.000210</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">49.5 帧 = 1.65 s</td>
+<td style="text-align: right;"><strong>100.0</strong></td>
+<td style="text-align: right;">10.0%</td>
+<td style="text-align: right;"><strong>0.04243</strong></td>
+<td style="text-align: right;"><strong>0.000195</strong></td>
+<td style="text-align: right;">未测</td>
+</tr>
+<tr>
+<td style="text-align: right;"><strong>−0.05</strong>（被测）</td>
+<td style="text-align: right;"><strong>141.2</strong></td>
+<td style="text-align: right;">18.8 帧 = 0.63 s</td>
+<td style="text-align: right;">39.5</td>
+<td style="text-align: right;"><strong>39.6%</strong></td>
+<td style="text-align: right;"><strong>0.02817</strong></td>
+<td style="text-align: right;">0.000256</td>
+<td style="text-align: right;"><strong>50%</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">+0.05（未测，判别实验）</td>
+<td style="text-align: right;">0.007</td>
+<td style="text-align: right;">2.67 s</td>
+<td style="text-align: right;">39.5</td>
+<td style="text-align: right;">0.4%</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">未测</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>coeff = −0.05</code> 并非"稍微偏新一点"：它给最新预测的权重是最老预测的 141 倍，
+将约 40% 的权重压在最近 10 次推理上，<strong>有效平均次数由 92 降至 40</strong>。
+R8 的建议 3 只计算了滞后（0.63 s vs 1.92 s，约 1/4，该部分正确），未计算 N_eff；
+真机结果表明后者才是代价所在。lerobot 上游 docstring 已就此给出警告
+（"highly weighing new actions might be detrimental… may diminish the benefits of action chunking"，
+参见 lerobot PR #319），真机复现了该结论。<strong>0.01 是 ACT 原论文默认值，真机结论是"默认值是对的"。</strong></p>
+<p><strong>机制尚未分离</strong>：自 +0.01 至 −0.05 同时改变了三件事——执行滞后（1.92 s → 0.63 s）、
+有效平均次数（92.4 → 39.5）、参与预测的视野（偏长 → 偏短）。两个数据点分不开三个共变量。
+<code>coeff = +0.05</code> 是干净的判别实验：其 N_eff 与 −0.05 相同（39.5），仅滞后与视野方向相反。</p>
+<h3 id="53">5.3 离线—真机对照</h3>
+<p>有 5 个格子同时具备离线 TE 数字与真机成功率。</p>
+<p><strong>表 18｜五个对照格与离线各栏（粗体为该栏离线最优）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>格子</th>
+<th style="text-align: right;">真机 %</th>
+<th style="text-align: right;">平坦 MAE</th>
+<th style="text-align: right;">acc@0.25σ</th>
+<th style="text-align: right;">末端位置 mm</th>
+<th style="text-align: right;">末端姿态 rad</th>
+<th style="text-align: right;">二阶差分</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>533</code> @ 0.01</td>
+<td style="text-align: right;">60</td>
+<td style="text-align: right;">0.04391</td>
+<td style="text-align: right;">0.702</td>
+<td style="text-align: right;">24.71</td>
+<td style="text-align: right;">0.1420</td>
+<td style="text-align: right;">0.000224</td>
+</tr>
+<tr>
+<td><code>616</code> @ 0.01</td>
+<td style="text-align: right;"><strong>80</strong></td>
+<td style="text-align: right;">0.04638</td>
+<td style="text-align: right;">0.695</td>
+<td style="text-align: right;">25.96</td>
+<td style="text-align: right;">0.1464</td>
+<td style="text-align: right;">0.000212</td>
+</tr>
+<tr>
+<td><code>616as</code> @ 0.01</td>
+<td style="text-align: right;"><strong>80</strong></td>
+<td style="text-align: right;">0.04626</td>
+<td style="text-align: right;">0.698</td>
+<td style="text-align: right;">25.64</td>
+<td style="text-align: right;">0.1465</td>
+<td style="text-align: right;"><strong>0.000210</strong></td>
+</tr>
+<tr>
+<td><code>616</code> @ −0.05</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;"><strong>0.02803</strong></td>
+<td style="text-align: right;"><strong>0.832</strong></td>
+<td style="text-align: right;"><strong>15.23</strong></td>
+<td style="text-align: right;"><strong>0.0873</strong></td>
+<td style="text-align: right;">0.000256</td>
+</tr>
+<tr>
+<td><code>616as</code> @ −0.05</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.02817</td>
+<td style="text-align: right;"><strong>0.833</strong></td>
+<td style="text-align: right;"><strong>14.98</strong></td>
+<td style="text-align: right;">0.0878</td>
+<td style="text-align: right;">0.000256</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>四栏准确度指标的离线最优，全部落在真机 50% 的两行上。</strong></p>
+<p><strong>表 19｜Spearman 秩相关（与真机成功率，n = 5）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>离线指标</th>
+<th style="text-align: right;">ρ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>平坦 14 维 MAE</td>
+<td style="text-align: right;"><strong>−0.949</strong></td>
+</tr>
+<tr>
+<td>acc@0.25σ</td>
+<td style="text-align: right;"><strong>−0.949</strong></td>
+</tr>
+<tr>
+<td>末端位置 (mm)</td>
+<td style="text-align: right;"><strong>−0.949</strong></td>
+</tr>
+<tr>
+<td>末端姿态 (rad)</td>
+<td style="text-align: right;"><strong>−0.949</strong></td>
+</tr>
+<tr>
+<td><strong>二阶差分（平滑度）</strong></td>
+<td style="text-align: right;"><strong>+0.973</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>n = 5 不足以支撑 p 值（双侧 Spearman 在 n = 5 上需 |ρ| = 1.0 方达 0.05）。
+<strong>因此正确的表述是"准确度型指标被证伪，平滑度是唯一尚未被证伪的候选"，
+而非"平滑度被证实为良好预测器"。两者地位不对称。</strong></p>
+<p>将 5 行拆为两种比较后方向仍独立成立：
+<strong>（a）跨系数（4 行）</strong>：−0.05 的 MAE 好 1.6 倍、位置好 1.7 倍，真机差 30 点，符号明确相反；
+<strong>（b）跨权重（3 行，同为 0.01）</strong>：平坦 MAE 与位置 mm 均判 533 最优（错），二阶差分判 616as 最优（对）。</p>
+<p><strong>归约的重要性</strong>：同一物理量"末端位置 mm"在 <code>replan_1</code> 归约下押对（9.27 vs 9.52 mm，
+对应真机 80% vs 60%），在 <code>ens_0.01</code> 归约下押反（24.71 vs 25.64/25.96）。
+<code>replan_1</code> 是无滞后代理，<code>ens_0.01</code> 是带 1.92 s 滞后的执行轨迹，后者的误差主要成分是滞后，
+<strong>滞后越小的权重误差越小，与其能否完成任务无关</strong>。</p>
+<h3 id="54">5.4 离线预测的成绩单</h3>
+<p><strong>表 20｜三条可证伪预测的真机判决</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>预测</th>
+<th>出处</th>
+<th>真机结果</th>
+<th>判决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>coeff 改至 −0.05 应"明显更跟手"，平滑度几乎不亏</td>
+<td>R8 §10-3、§8</td>
+<td>80% → 50%，3/3 同向，p = 4e-5</td>
+<td><strong>证伪（强）</strong></td>
+</tr>
+<tr>
+<td>P2</td>
+<td>换至 616 系，依据为末端位置 mm 与右夹爪，<strong>不要用平坦 MAE</strong></td>
+<td>R8 §10-1、§1-2</td>
+<td>616/616as 80% vs 533 60%，p = 0.049</td>
+<td><strong>证实（压线）</strong></td>
+</tr>
+<tr>
+<td>P3</td>
+<td>离线精度在 50k–100k 触底，之后单调变差</td>
+<td>R7 §7.1</td>
+<td>200k ≥ 100k，3/3 同向 +10 点，p = 0.17</td>
+<td><strong>方向被否（弱）</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>三条中被推翻的两条<strong>同源于"离线 MAE 更低故更好"这一个推理</strong>；唯一站住的 P2，
+恰是明确放弃平坦 MAE、改用另外三个数的那一条。</p>
+<h3 id="55-acteef_505">5.5 <code>acteef_505</code> 的倒挂</h3>
+<p><strong>表 21｜离线四项垫底、真机并列第一</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>权重</th>
+<th style="text-align: right;"><code>policy_raw</code></th>
+<th style="text-align: right;"><code>policy_deployed</code></th>
+<th style="text-align: right;">位置 mm</th>
+<th style="text-align: right;">姿态 deg</th>
+<th style="text-align: right;">vs null</th>
+<th style="text-align: right;">真机 200k</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acteef_533</code></td>
+<td style="text-align: right;"><strong>0.03689</strong>①</td>
+<td style="text-align: right;"><strong>0.03975</strong>①</td>
+<td style="text-align: right;"><strong>10.51</strong>①</td>
+<td style="text-align: right;"><strong>3.87</strong>①</td>
+<td style="text-align: right;"><strong>2.23×</strong>①</td>
+<td style="text-align: right;"><strong>60%</strong>⑤</td>
+</tr>
+<tr>
+<td><code>acteef_616</code></td>
+<td style="text-align: right;">0.03783</td>
+<td style="text-align: right;">0.04067</td>
+<td style="text-align: right;">10.68</td>
+<td style="text-align: right;">3.93</td>
+<td style="text-align: right;">2.17×</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+<tr>
+<td><code>acteef_616as</code></td>
+<td style="text-align: right;">0.03781</td>
+<td style="text-align: right;">0.04069</td>
+<td style="text-align: right;">10.56</td>
+<td style="text-align: right;">3.96</td>
+<td style="text-align: right;">2.17×</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+<tr>
+<td><code>acteef_505</code></td>
+<td style="text-align: right;">0.03961⑤</td>
+<td style="text-align: right;">0.04162⑤</td>
+<td style="text-align: right;">10.95</td>
+<td style="text-align: right;">4.17⑤</td>
+<td style="text-align: right;">2.07×⑤</td>
+<td style="text-align: right;"><strong>80%</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>①离线该栏第一 ⑤该栏最后。<strong>离线第一名是真机最后一名，离线最后一名是真机并列第一</strong>，
+四份权重秩相关 ρ = −0.775（n = 4，不足以给 p 值，方向与表 19 一致）。</p>
+<p>三条限定：（i）<code>acteef_505</code> 无 TE 模式离线评测，上表比的是已被证明"真机不执行"的 chunk 链；
+（ii）但倒挂不因此消失——R8 的 TE 模式平坦 MAE 同样将 533 排第一，两把不同的离线尺子在 533 一格上一起押反；
+（iii）观察到成绩单沿数据集包含关系分组（<code>505_eef ⊂ 616_eef</code> 同为 80%，而有 67 集在外的 533 为 60%），
+<strong>而非沿集数分组</strong>。此为观察，非结论：n = 4 份权重支撑不了因果。</p>
+<p><strong>账目修订</strong>：<code>MASTER-LEDGER §0</code> 第 1 条"三个月里没有任何权重在部署口径上超过 <code>acteef_533</code>"
+在离线部署口径上仍为真，但<strong>真机口径上已有三个反例</strong>。</p>
+<h3 id="56-chunk-n-40">5.6 chunk 模式在 n &lt; 40 时的硬编码缺陷</h3>
+<p><code>send_next_action_chunk</code>（<code>core.py:479-505</code>）：<code>bridge_steps = min(40, chunk.shape[0])</code>；
+<code>cubic_hermite_segment</code>（<code>trajectory.py:89</code>）：<code>if num_steps == 1: return start.unsqueeze(0)</code>，
+其中 <code>start</code> 为机械臂当前实测反馈。</p>
+<ul>
+<li><strong>chunk = 1</strong>：整条下发动作被改写为当前实测位姿，<strong>任何 checkpoint 都不会前进</strong>。这是缺陷，不是权重弱。</li>
+<li><strong>chunk = 3/5/10</strong>：<code>bridge_steps == chunk</code> 长度，整条 chunk 全为桥，原始策略帧一帧不剩，
+  且 <code>start_velocity = 0.0</code> 使每次下发自零速重启（走停现象）。另外，桥只改写 12 个位姿维
+  （<code>ACTION_LAYOUT</code> 的 <code>n_bridge</code>），<strong>两个夹爪维保持原始时序</strong>，导致抓取时序与手臂运动脱钩。</li>
+</ul>
+<p><code>ENABLE_FIXED_K_REAL_STATE_BRIDGE = True</code>（<code>core.py:55</code>），默认开启。
+使用者在 chunk 模式下扫描到的成功率曲线，度量的是这座桥，不是权重之间的差别。</p>
+<hr />
+<h2 id="6-act">6. <code>act</code> 线结果（一）：架构深度</h2>
+<p>数据来源 R1。实测环境 RTX 4090 / torch 2.11.0+cu130 / 3 相机 480×640 /
+<code>hidden_dim</code> 512 / <code>dim_feedforward</code> 3200 / <code>chunk_size</code> 100 / <code>action_dim</code> 16。</p>
+<h3 id="61-decoder">6.1 三方实现对照与 decoder 输出索引缺陷</h3>
+<p>上游 ACT 配置 <code>dec_layers = 7</code>，但代码取 <code>transformer(...)[0]</code>，<strong>实际生效仅 1 层</strong>；
+LeRobot 选择保留该行为并将 <code>n_decoder_layers</code> 默认值直接设为 1；
+本仓库（<code>ACT_rosbag2</code>）在 commit <code>6000eb0</code>（2026-07-28）改为 <code>[-1]</code>，<strong>7 层全部生效</strong>。</p>
+<p><strong>表 22｜梯度范数实测（同一模型 enc=4, dec=7，单次 backward，<code>linear1.weight</code>）</strong></p>
+<pre><code>index [0]  -&gt; L0:9.741e-01  L1:0.000e+00  L2:0.000e+00 … L6:0.000e+00
+index [-1] -&gt; L0:2.427e-01  L1:3.055e-01  L2:4.112e-01 … L6:8.831e-01
+</code></pre>
+<p><strong>表 23｜两种取法的规模含义</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;"><code>[0]</code>（上游 / LeRobot）</th>
+<th style="text-align: right;"><code>[-1]</code>（本仓库当前）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>decoder 总参数</td>
+<td style="text-align: right;">37 694 848</td>
+<td style="text-align: right;">37 694 848</td>
+</tr>
+<tr>
+<td>其中可训练生效</td>
+<td style="text-align: right;">5 385 856</td>
+<td style="text-align: right;">37 694 848</td>
+</tr>
+<tr>
+<td><strong>死参数</strong></td>
+<td style="text-align: right;"><strong>32 308 992（全模型 38.5%）</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>单帧推理浪费时间</td>
+<td style="text-align: right;">≈ 2.09 ms（23%）</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>单帧推理浪费算力</td>
+<td style="text-align: right;">≈ 12.7 GFLOP（15%）</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>这是一个静默的 checkpoint 破坏性变更</strong>：<code>6000eb0</code> 之前训练的权重其 decoder L1–L6 停留在
+Xavier 初值，因 shape 完全匹配，<code>load_state_dict(strict=True)</code> 不报错，但推理会穿过 6 层
+随机初始化残差块。反向亦不通。<strong>无法从 checkpoint 文件本身区分</strong>，只能依据训练时间戳 / 代码版本。</p>
+<p>需要注意：ACT 论文报告的成功率与 LeRobot 的对齐结果均在<strong>等效 1 层 decoder</strong> 下取得，
+本仓库当前运行的是一个未经公开验证的 7 层配置（参数 51.6M → 83.9M，+63%），
+而其优化设置无 lr scheduler、无 warmup、无 gradient clipping、无 AMP，且为 post-norm。
+<strong><code>dec_layers ∈ {1, 4, 7}</code> 的正式消融尚未执行。</strong></p>
+<h3 id="62">6.2 层数扫描实测</h3>
+<p>单帧推理：batch = 1，3 相机 480×640，<code>torch.no_grad()</code>，30 次取中位数 / P95。
+训练步：batch = 8，含 forward + backward + AdamW step，12 步取均值。</p>
+<p><strong>表 24｜编解码器层数扫描（11 组配置）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th style="text-align: right;">enc</th>
+<th style="text-align: right;">dec</th>
+<th style="text-align: right;">vae_enc</th>
+<th style="text-align: right;">总参数</th>
+<th style="text-align: right;">obs enc</th>
+<th style="text-align: right;">decoder</th>
+<th style="text-align: right;">vae enc</th>
+<th style="text-align: right;">推理 P50 (ms)</th>
+<th style="text-align: right;">推理 P95 (ms)</th>
+<th style="text-align: right;">训练/步 (ms)</th>
+<th style="text-align: right;">峰值显存 (GB)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;"><strong>1</strong></td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">51.62M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">5.39M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;"><strong>6.83</strong></td>
+<td style="text-align: right;">7.38</td>
+<td style="text-align: right;">117.1</td>
+<td style="text-align: right;">5.91</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">57.00M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">10.77M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">7.27</td>
+<td style="text-align: right;">7.76</td>
+<td style="text-align: right;">118.3</td>
+<td style="text-align: right;">6.14</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">67.77M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">21.54M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">7.82</td>
+<td style="text-align: right;">8.40</td>
+<td style="text-align: right;">124.8</td>
+<td style="text-align: right;">6.59</td>
+</tr>
+<tr>
+<td style="text-align: right;"><strong>4</strong></td>
+<td style="text-align: right;"><strong>7</strong></td>
+<td style="text-align: right;"><strong>4</strong></td>
+<td style="text-align: right;"><strong>83.93M</strong></td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;"><strong>8.92</strong></td>
+<td style="text-align: right;">9.65</td>
+<td style="text-align: right;"><strong>135.0</strong></td>
+<td style="text-align: right;"><strong>7.26</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">100.08M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">53.85M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">10.48</td>
+<td style="text-align: right;">10.92</td>
+<td style="text-align: right;">144.9</td>
+<td style="text-align: right;">7.93</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">57.93M</td>
+<td style="text-align: right;">4.33M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">4.33M</td>
+<td style="text-align: right;">7.49</td>
+<td style="text-align: right;">7.76</td>
+<td style="text-align: right;">95.7</td>
+<td style="text-align: right;">4.46</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">66.59M</td>
+<td style="text-align: right;">8.67M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">8.67M</td>
+<td style="text-align: right;">7.98</td>
+<td style="text-align: right;">8.60</td>
+<td style="text-align: right;">108.5</td>
+<td style="text-align: right;">5.39</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">101.26M</td>
+<td style="text-align: right;">26.00M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">26.00M</td>
+<td style="text-align: right;">10.00</td>
+<td style="text-align: right;">10.53</td>
+<td style="text-align: right;">161.8</td>
+<td style="text-align: right;">9.13</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">118.59M</td>
+<td style="text-align: right;">34.67M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">34.67M</td>
+<td style="text-align: right;">10.98</td>
+<td style="text-align: right;">11.71</td>
+<td style="text-align: right;">188.6</td>
+<td style="text-align: right;">11.00</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;"><strong>1</strong></td>
+<td style="text-align: right;">70.93M</td>
+<td style="text-align: right;">17.33M</td>
+<td style="text-align: right;">37.69M</td>
+<td style="text-align: right;">4.33M</td>
+<td style="text-align: right;">8.98</td>
+<td style="text-align: right;">9.88</td>
+<td style="text-align: right;">132.2</td>
+<td style="text-align: right;">6.94</td>
+</tr>
+</tbody>
+</table></div>
+<p>加粗行分别为 LeRobot 默认等效配置（enc4/dec1）与本仓库当前配置（enc4/dec7）。</p>
+<ul>
+<li><strong>单层边际成本（推理）</strong>：decoder ≈ 0.40 ms/层，obs encoder ≈ 0.50 ms/层。</li>
+<li><strong>单层边际成本（训练，bs=8）</strong>：decoder ≈ 3.1 ms/层 / +0.22 GB；
+  encoder ≈ 13.3 ms/层 / +0.93 GB。<strong>encoder 深度在训练侧比 decoder 贵 4 倍以上。</strong></li>
+<li><strong>VAE encoder 深度对推理完全免费</strong>（末行 vae_enc 4→1：参数少 13.0M，推理 8.98 vs 8.92 ms 在噪声内），
+  但训练省 2.8 ms/步、0.32 GB。本仓库 <code>enc_layers</code> <strong>一个参数同时控制 obs encoder 与 CVAE style encoder</strong>，
+  而后者在推理时完全不运行——绑定调参是纯浪费；LeRobot 已拆分为 <code>n_encoder_layers</code> / <code>n_vae_encoder_layers</code>。</li>
+<li>本仓库当前配置相对 LeRobot 默认：参数 +63%，单帧推理 +2.09 ms（+31%），训练步 +15%。</li>
+</ul>
+<p><strong>表 25｜backbone 扫描（enc=4, dec=7）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>backbone</th>
+<th style="text-align: right;">总参数</th>
+<th style="text-align: right;">backbone 参数</th>
+<th style="text-align: right;">推理 P50 (ms)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>resnet18</td>
+<td style="text-align: right;">83.93M</td>
+<td style="text-align: right;">11.17M</td>
+<td style="text-align: right;"><strong>8.99</strong></td>
+</tr>
+<tr>
+<td>resnet34</td>
+<td style="text-align: right;">94.03M</td>
+<td style="text-align: right;">21.27M</td>
+<td style="text-align: right;">12.44</td>
+</tr>
+<tr>
+<td>resnet50</td>
+<td style="text-align: right;">97.00M</td>
+<td style="text-align: right;">23.45M</td>
+<td style="text-align: right;">14.41</td>
+</tr>
+</tbody>
+</table></div>
+<p>resnet18 → resnet34 仅增 10.1M 参数却增加 3.45 ms，相当于 8.6 层 decoder 的时间代价，
+原因是 backbone 在 480×640 全分辨率上运行且每相机各跑一次。
+（resnet50 输出 2048 通道，<code>input_proj</code> 变为 2048→512，checkpoint 与 resnet18 不兼容。）</p>
+<p><strong>表 26｜理论 FLOP 分解（单帧推理，MAC 按 2 FLOP 计）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>分辨率 / 相机数</th>
+<th style="text-align: right;">token 数 N</th>
+<th style="text-align: right;">backbone 合计</th>
+<th style="text-align: right;">obs enc/层</th>
+<th style="text-align: right;">decoder/层</th>
+<th style="text-align: right;">vae enc/层（仅训练）</th>
+<th style="text-align: right;">enc4+dec7 合计</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>480×640 × 3</td>
+<td style="text-align: right;">902</td>
+<td style="text-align: right;">33.43 G</td>
+<td style="text-align: right;"><strong>9.47 G</strong></td>
+<td style="text-align: right;"><strong>2.12 G</strong></td>
+<td style="text-align: right;">0.90 G</td>
+<td style="text-align: right;">86.15 G</td>
+</tr>
+<tr>
+<td>240×320 × 3</td>
+<td style="text-align: right;">242</td>
+<td style="text-align: right;">8.91 G</td>
+<td style="text-align: right;">2.21 G</td>
+<td style="text-align: right;">1.29 G</td>
+<td style="text-align: right;">0.90 G</td>
+<td style="text-align: right;">26.82 G</td>
+</tr>
+<tr>
+<td>480×640 × 1</td>
+<td style="text-align: right;">302</td>
+<td style="text-align: right;">11.14 G</td>
+<td style="text-align: right;">2.80 G</td>
+<td style="text-align: right;">1.37 G</td>
+<td style="text-align: right;">0.90 G</td>
+<td style="text-align: right;">31.92 G</td>
+</tr>
+</tbody>
+</table></div>
+<p>一个 obs encoder 层的算力 = 4.5 个 decoder 层；实测延迟却是 0.50 vs 0.40 ms/层，
+因 batch = 1 时 GPU 严重欠占用、处于 kernel launch 主导区间，FLOP 差异被掩盖。
+<strong>encoder 层的代价随 token 数超线性增长</strong>（含 N² 项），decoder 层近似线性，
+故"高分辨率 + 深 encoder"是最贵的组合。</p>
+<p><strong>结论</strong>：层数不是 4090 上的部署瓶颈（11 组配置单帧推理均在 6.7–11.0 ms），但是训练成本的主要来源
+（encoder 4 → 8 层：训练步 +40%、峰值显存 +52%）。</p>
+<hr />
+<h2 id="7-act-act_delta">7. <code>act</code> 线结果（二）：动作表示（<code>act_delta</code>）</h2>
+<p>数据来源 R4、R5。数据集 <code>tidy_up_stationery_le/batch_5</code>（30 条示教 / 30 134 帧）及其相对化版本。</p>
+<h3 id="71">7.1 第一轮：自变量为空</h3>
+<p>首次 <code>act_delta</code> 训练的 checkpoint 中 <code>use_relative_actions = false</code>，训练命令亦无该参数。
+按 <code>modeling_act_delta.py:40-42</code> 自述，该配置下 <code>ACTDeltaPolicy</code> 即 <strong>bit-for-bit 的上游 ACT</strong>。
+即该轮实验<strong>没有任何自变量被改变，成功率不变是预期结果</strong>。
+<code>validate_relative_setup()</code> 在开关关闭时第一行即 return，全部一致性检查被跳过，
+从训练到部署无任何一处报错。</p>
+<p>第二轮修复后确认：<code>use_relative_actions: true</code>、<code>relative_consistency_check: "error"</code>、
+stats 已在相对空间重算（手臂 14 维 <code>|mean|/std</code> 由 3.188 降至 <strong>0.034</strong>）、无双重相对化。</p>
+<h3 id="72">7.2 留出集泛化差距（核心结果）</h3>
+<p>留出集构造：<code>batch_5(30) ⊆ batch_6(61) ⊆ batch7(163)</code> 为累积超集（按 episode 指纹逐条确认），
+故仅取 batch_6 中<strong>未出现在 batch_5 的 31 条</strong>，采样 240 个 anchor。
+三个 batch 的任务串、fps、相机、特征 shape、首帧位姿（逐条 std ≤ 0.0027 rad）完全一致。</p>
+<p><strong>表 27｜in-sample 与真留出集对照（手臂 14 维 MAE，rad）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">in-sample</th>
+<th style="text-align: right;"><strong>真留出集</strong></th>
+<th style="text-align: right;">泛化倍数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>REL100k</strong>（相对动作，100k 步）</td>
+<td style="text-align: right;">0.00794</td>
+<td style="text-align: right;"><strong>0.08417</strong></td>
+<td style="text-align: right;"><strong>10.6×</strong></td>
+</tr>
+<tr>
+<td><strong>ABS200k</strong>（绝对动作，200k 步）</td>
+<td style="text-align: right;">0.00583</td>
+<td style="text-align: right;"><strong>0.15379</strong></td>
+<td style="text-align: right;"><strong>26.4×</strong></td>
+</tr>
+<tr>
+<td>ABS100k（绝对动作，100k 步）</td>
+<td style="text-align: right;">0.00829</td>
+<td style="text-align: right;">0.15312</td>
+<td style="text-align: right;">18.5×</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>表 28｜留出集逐 k 与分组（rad）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>模型</th>
+<th style="text-align: right;">overall</th>
+<th style="text-align: right;">k=0</th>
+<th style="text-align: right;">k=29</th>
+<th style="text-align: right;">k=49</th>
+<th style="text-align: right;">k=99</th>
+<th style="text-align: right;">L 臂</th>
+<th style="text-align: right;">R 臂</th>
+<th style="text-align: right;">夹爪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REL100k</td>
+<td style="text-align: right;"><strong>0.08417</strong></td>
+<td style="text-align: right;"><strong>0.01728</strong></td>
+<td style="text-align: right;"><strong>0.06283</strong></td>
+<td style="text-align: right;"><strong>0.08670</strong></td>
+<td style="text-align: right;"><strong>0.13899</strong></td>
+<td style="text-align: right;">0.07836</td>
+<td style="text-align: right;">0.08998</td>
+<td style="text-align: right;">0.06834</td>
+</tr>
+<tr>
+<td>ABS200k</td>
+<td style="text-align: right;">0.15379</td>
+<td style="text-align: right;">0.12500</td>
+<td style="text-align: right;">0.14290</td>
+<td style="text-align: right;">0.15641</td>
+<td style="text-align: right;">0.17750</td>
+<td style="text-align: right;">0.15157</td>
+<td style="text-align: right;">0.15601</td>
+<td style="text-align: right;">0.06069</td>
+</tr>
+<tr>
+<td>ABS100k</td>
+<td style="text-align: right;">0.15312</td>
+<td style="text-align: right;">0.12361</td>
+<td style="text-align: right;">0.14134</td>
+<td style="text-align: right;">0.15512</td>
+<td style="text-align: right;">0.17778</td>
+<td style="text-align: right;">0.15100</td>
+<td style="text-align: right;">0.15523</td>
+<td style="text-align: right;">0.06135</td>
+</tr>
+</tbody>
+</table></div>
+<p>三条读法：</p>
+<p><strong>（a）相对动作在留出集上大幅胜出。</strong> REL/ABS200k 比值：k=0 为 0.138、k=49 为 0.554、
+k=99 为 0.783、整体 <strong>0.547（即 1.83×）</strong>，<strong>没有任何一个 k 上相对模型更差</strong>，
+且相对模型只训练了一半步数。in-sample 时 ABS 反而"更准"（0.00583 vs 0.00794）——<strong>那是记忆，不是能力</strong>。
+机制直接：30 条 episode 全部从同一位姿起步（首帧 std ≤ 0.0027 rad），
+绝对表示下网络可靠记忆"第 t 帧应在哪个绝对关节角"取得满分，该捷径在新场景完全失效
+（ABS 在 k=0 已错 0.125 rad）；相对表示堵死捷径，迫使网络学习"从当前位姿该往哪走"。</p>
+<p><strong>（b）后 100k 步的泛化收益为零。</strong> ABS100k → ABS200k：in-sample 0.00829 → 0.00583（<strong>−30%</strong>），
+留出集 0.15312 → 0.15379（<strong>+0.4%</strong>）。训练 loss 持续下降、in-sample MAE 持续下降、留出集纹丝不动。</p>
+<p><strong>（c）两个模型都远未达到任务所需精度。</strong> 0.08417 rad ≈ <strong>4.8°/关节</strong>，7 关节叠加至末端为厘米量级偏差；
+文具整理需要毫米量级。相对模型只是"没那么离谱"。</p>
+<p><strong>保留意见</strong>：留出 MAE 是对单条参考轨迹计算的，而整理文具是多目标任务，
+"策略做了另一个同样合理的选择"也会被记为误差，故 0.08417 这一绝对值偏悲观。
+但比值（0.547）与"后 100k 步零收益"两条是稳健的——多模态性对被比较的两方一视同仁。</p>
+<h3 id="73-chunk">7.3 相对化的方差增益沿 chunk 分布不均</h3>
+<p><strong>表 29｜逐 k 目标 std（手臂 14 维平均，全部 27 134 个 chunk）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th style="text-align: right;">k</th>
+<th style="text-align: right;">rel_std</th>
+<th style="text-align: right;">abs_std</th>
+<th style="text-align: right;">方差增益</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.0158</td>
+<td style="text-align: right;">0.2921</td>
+<td style="text-align: right;"><strong>18.48×</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.0595</td>
+<td style="text-align: right;">0.2916</td>
+<td style="text-align: right;">4.90×</td>
+</tr>
+<tr>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">0.1337</td>
+<td style="text-align: right;">0.2914</td>
+<td style="text-align: right;">2.18×</td>
+</tr>
+<tr>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.1913</td>
+<td style="text-align: right;">0.2920</td>
+<td style="text-align: right;">1.53×</td>
+</tr>
+<tr>
+<td style="text-align: right;">99</td>
+<td style="text-align: right;">0.2877</td>
+<td style="text-align: right;">0.2928</td>
+<td style="text-align: right;"><strong>1.02×</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>绝对空间的 per-k std 恒定于 0.292；相对空间自 0.0158 涨至 0.2877，跨度 18×。
+k=0 附近 <code>Δ_k = a_k − s_0</code> 几乎恒为 0（主从遥操，<code>mean|a_0 − s_0| ≈ 0.008 rad</code>），
+目标近乎无需学习，顺滑性是"白送的"；k=99 处相对化一点方差都没省。</p>
+<p><strong>两处对前作的更正</strong>（R5 §3.3）：（i）R4 报告的"平均方差增益 1.59×"具有误导性，
+它把 k=0 的 18.5× 与 k=99 的 1.02× 平均成了一个数；（ii）R4 称"归一化器把 loss 权重
+从 chunk 头部搬到尾部"<strong>是错的</strong>——归一化是 per-dim 常数缩放，<code>σ_pooled</code> 不随 k 变化，
+每个 k 上每弧度物理误差贡献的 loss 完全相同。误差爬升来自<strong>目标熵</strong>差异，不是 loss 权重。
+因此 <code>loss_time_decay</code> / <code>loss_front_weight</code> 对本问题无效，方向亦反。</p>
+<p><code>n_action_steps</code> 100 → 50 的收益：in-sample k=99 → k=49 为 0.01142 → 0.00798（−30%，
+绝对量仅 0.0034 rad ≈ 0.2°）；留出集 0.13899 → 0.08670（−38%，绝对量 0.052 rad ≈ 3.0°）。
+<strong>该改动方向正确、免费、无副作用，但在留出误差降至 0.02 rad 量级之前不会产生可见效果。</strong></p>
+<h3 id="74">7.4 视觉依赖的左右不对称</h3>
+<p><strong>表 30｜相机消融（替换某路相机为另一帧图像后的预测变化，rad）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>消融</th>
+<th style="text-align: right;">全 k</th>
+<th style="text-align: right;">k=99</th>
+<th style="text-align: right;">L 臂</th>
+<th style="text-align: right;">R 臂</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cam:top</code></td>
+<td style="text-align: right;">0.0341</td>
+<td style="text-align: right;">0.0522</td>
+<td style="text-align: right;">0.0270</td>
+<td style="text-align: right;">0.0413</td>
+</tr>
+<tr>
+<td><code>cam:wrist_L</code></td>
+<td style="text-align: right;">0.0526</td>
+<td style="text-align: right;">0.0705</td>
+<td style="text-align: right;">0.0408</td>
+<td style="text-align: right;">0.0644</td>
+</tr>
+<tr>
+<td><code>cam:wrist_R</code></td>
+<td style="text-align: right;"><strong>0.0948</strong></td>
+<td style="text-align: right;">0.1565</td>
+<td style="text-align: right;">0.0707</td>
+<td style="text-align: right;"><strong>0.1189</strong></td>
+</tr>
+<tr>
+<td>三路全换</td>
+<td style="text-align: right;">0.1775</td>
+<td style="text-align: right;">0.3124</td>
+<td style="text-align: right;">0.1281</td>
+<td style="text-align: right;">0.2269</td>
+</tr>
+<tr>
+<td>state 换掉</td>
+<td style="text-align: right;">0.3211</td>
+<td style="text-align: right;">0.3149</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table></div>
+<p>"模型忽略相机"这一假设被排除：换相机可使预测变化 0.1775 rad，是其自身拟合误差（0.008）的 22 倍。
+<strong>右臂对视觉的依赖是左臂的 1.77×</strong>（0.2269 vs 0.1281），<code>wrist_R</code> 影响力是 <code>wrist_L</code> 的 1.80×。
+即左臂动作很大程度可从本体状态推出（刻板轨迹），右臂必须真正理解场景；
+在新的物体摆位下泛化误差集中于右臂，与留出集 R/L = 1.15 及真机观察一致。</p>
+<h3 id="75">7.5 真机日志诊断</h3>
+<p><strong>表 31｜两轮部署日志</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th style="text-align: right;"><code>n_action_steps=100</code></th>
+<th style="text-align: right;"><code>n_action_steps=50</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>|a0 − state|</code> 手臂均值 (rad)</td>
+<td style="text-align: right;">0.0074</td>
+<td style="text-align: right;">0.0070</td>
+</tr>
+<tr>
+<td>chunk 末端跟踪误差中位数 (rad)</td>
+<td style="text-align: right;">0.0277</td>
+<td style="text-align: right;">0.0336</td>
+</tr>
+<tr>
+<td>实际位移 / 指令位移</td>
+<td style="text-align: right;">0.986</td>
+<td style="text-align: right;">0.949</td>
+</tr>
+<tr>
+<td>部署/训练位移比（最近邻）</td>
+<td style="text-align: right;">0.991</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td>轨迹直线度（净/弧长）</td>
+<td style="text-align: right;">0.845（训练 0.756）</td>
+<td style="text-align: right;">0.906</td>
+</tr>
+</tbody>
+</table></div>
+<p>三个常见误诊被排除：不是"动得不够远"（位移比 0.991），不是"跟不上指令"（跟踪误差 0.03 rad），
+不是"下发速率 / 时间缩放不对"。<strong>机器人精确执行了一个目标算错了的指令。</strong></p>
+<hr />
+<h2 id="8-act">8. <code>act</code> 线结果（三）：失败/纠错数据消融</h2>
+<p>数据来源 R6。<strong>前置声明</strong>：三个 job 的 <code>env_eval_freq</code> 均为 0，磁盘上无任何 rollout 成功率记录。
+本节全部为离线指标（数据统计 + teacher-forcing 开环 chunk 误差 + 遮挡消融）；
+"加了失败数据后表现变差"目前<strong>只有主观观察支撑，没有闭环数字</strong>。</p>
+<h3 id="81">8.1 数据与训练</h3>
+<p><strong>表 32｜三个数据集组成</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>数据集</th>
+<th style="text-align: right;">episodes</th>
+<th style="text-align: right;">frames</th>
+<th style="text-align: right;">平均长度</th>
+<th style="text-align: right;">失败占比 (ep)</th>
+<th style="text-align: right;">失败占比 (<strong>帧</strong>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>batch_success_361</code></td>
+<td style="text-align: right;">363</td>
+<td style="text-align: right;">300 689</td>
+<td style="text-align: right;">828.3</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><code>batch_success_361_fail_36</code></td>
+<td style="text-align: right;">399</td>
+<td style="text-align: right;">336 477</td>
+<td style="text-align: right;">843.3</td>
+<td style="text-align: right;">9.02%</td>
+<td style="text-align: right;"><strong>10.64%</strong></td>
+</tr>
+<tr>
+<td><code>batch_success_361_fail_72</code></td>
+<td style="text-align: right;">435</td>
+<td style="text-align: right;">368 957</td>
+<td style="text-align: right;">848.2</td>
+<td style="text-align: right;">16.55%</td>
+<td style="text-align: right;"><strong>18.50%</strong></td>
+</tr>
+<tr>
+<td><code>batch_fail_36</code>（单独）</td>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">35 788</td>
+<td style="text-align: right;">994.1</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td><code>batch_fail_72</code>（单独）</td>
+<td style="text-align: right;">72</td>
+<td style="text-align: right;">68 268</td>
+<td style="text-align: right;">948.2</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>batch_fail_36</code> 是 <code>batch_fail_72</code> 的前 36 条，两次实验嵌套，构成干净的比例消融。
+失败 episode 位于合并集 index <code>0..35</code> / <code>0..71</code>（前置）。
+<strong>六个数据集的 task 字符串全部为 <code>"Unspecified task"</code>，<code>total_tasks = 1</code></strong>——
+策略在输入端完全无法区分一条轨迹是成功演示还是纠错演示。</p>
+<p><strong>采集会话块</strong>：<code>batch_7</code>（成功 163 条）跨 3 天，<code>batch_8</code>（成功 200 条）为 08-17 一个下午，
+而 <code>batch_fail_72</code> 为 <strong>08-18 单场次 1 小时 43 分</strong>。</p>
+<p>三次训练策略配置相同：<code>chunk_size=100, n_action_steps=100, temporal_ensemble_coeff=None,
+use_vae=True, latent_dim=32, kl_weight=10.0, n_obs_steps=1, resnet18, lr=1e-5</code>。
+末端训练 loss 分别为 0.042 / 0.040 / 0.041——<strong>三者几乎相同这一事实，是"训练 loss 在本问题上
+完全没有信息量"的证据，而非"没问题"的证据。</strong></p>
+<h3 id="82">8.2 主表</h3>
+<p><strong>表 33｜三份权重的开环 chunk L1 误差（200k 步对齐，rad）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>checkpoint</th>
+<th style="text-align: right;">成功集</th>
+<th style="text-align: right;">失败集前 36 条</th>
+<th style="text-align: right;">失败集后 36 条</th>
+<th style="text-align: right;"><code>batch_1</code>（08-07，三者皆未见）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>succ361</code> 200k</td>
+<td style="text-align: right;"><strong>0.0117</strong></td>
+<td style="text-align: right;">0.0812</td>
+<td style="text-align: right;">0.0775</td>
+<td style="text-align: right;">0.1412</td>
+</tr>
+<tr>
+<td><code>+fail36</code> 200k</td>
+<td style="text-align: right;">0.0129</td>
+<td style="text-align: right;"><em>0.0121</em>（已见）</td>
+<td style="text-align: right;"><strong>0.0516</strong>（未见）</td>
+<td style="text-align: right;">0.1345</td>
+</tr>
+<tr>
+<td><code>+fail72</code> 200k</td>
+<td style="text-align: right;">0.0129</td>
+<td style="text-align: right;"><em>0.0121</em>（已见）</td>
+<td style="text-align: right;"><em>0.0125</em>（已见）</td>
+<td style="text-align: right;">0.1305</td>
+</tr>
+<tr>
+<td><code>+fail36</code> 250k</td>
+<td style="text-align: right;">0.0117</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.1356</td>
+</tr>
+<tr>
+<td><code>+fail72</code> 250k</td>
+<td style="text-align: right;">0.0118</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.1289</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>斜体 = 训练集内拟合，非泛化。</em></p>
+<p>五条读数：</p>
+<ol>
+<li><strong>加失败数据对成功分布的拟合损伤约 +10%，且到 250k 完全消失</strong>（0.0117 → 0.0129 → 0.0117/0.0118）。
+   排除"容量不足"与"被稀释"两个常见猜测。</li>
+<li><strong>模型把两个动作分歧 18× 的模式都拟合到了 0.012 rad</strong>（<code>+fail72</code> 在成功集 0.0129、
+   在失败集 0.0121/0.0125，一样好）。在两模式于 state 空间重叠的前提下，
+   模型能同时拟合两者，<strong>只可能是找到了某个观测线索做模式选择</strong>。</li>
+<li><strong>36 条失败数据对失败模式的泛化是失败的</strong>：<code>+fail36</code> 在见过的 36 条上 0.0121，
+   在未见的另 36 条上 <strong>0.0516（4.3×）</strong>。（相对基线 0.0775 确有 33% 改善，但离"学会了"差一个量级。）
+   这直接否定"少加一点失败数据就能学会恢复"的想法。</li>
+<li><strong>跨场次泛化对所有权重都是灾难</strong>：<code>batch_1</code> 上全部 0.13–0.14 rad，是同分布误差的 <strong>11 倍</strong>。
+   加失败数据使其自 0.1412 降至 0.1305（−7.6%），方向正确但相对 11× 的鸿沟无实质意义。</li>
+<li><strong>离线指标看不见观察到的退化</strong>。成功分布上最多 +10%（且 250k 归零），跨场次上甚至更好。
+   若闭环确实明显变差，<strong>伤害 100% 发生在开环指标测不到的地方</strong>。</li>
+</ol>
+<h3 id="83">8.3 伤害机制</h3>
+<p><strong>表 34｜条件动作分歧（最近邻法）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>查询</th>
+<th style="text-align: right;">最近邻距离（中位数, σ）</th>
+<th style="text-align: right;">p90</th>
+<th style="text-align: right;">匹配上时未来 100 步 chunk MAE (rad)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>成功帧 → 成功集</td>
+<td style="text-align: right;"><strong>0.040</strong></td>
+<td style="text-align: right;">0.345</td>
+<td style="text-align: right;"><strong>0.0036</strong></td>
+</tr>
+<tr>
+<td>失败帧 → 成功集</td>
+<td style="text-align: right;"><strong>0.687</strong></td>
+<td style="text-align: right;">1.059</td>
+<td style="text-align: right;"><strong>0.0651</strong>（限 d &lt; 0.5σ, n = 507）</td>
+</tr>
+</tbody>
+</table></div>
+<p>成功集自身最近邻距离 0.040σ，说明 361 条演示基本互为副本的窄管道，任何新分布都是大扰动；
+在两者确实重合的状态上，未来动作分歧是成功集内部的 <strong>18 倍</strong>。
+ACT 解码器推理时取 <code>z = 0</code>，当同一观测对应两个差异 18× 的动作模式而模型无法区分时，
+L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了该抓的位置反而悬停"。</p>
+<p><strong>表 35｜遮挡消融（基线权重，成功集，等大小 120 行条带）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>遮挡区域（头相机 480 行）</th>
+<th style="text-align: right;">开环 chunk L1 (rad)</th>
+<th style="text-align: right;">相对干净输入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>不遮挡</td>
+<td style="text-align: right;">0.0117</td>
+<td style="text-align: right;">1.00×</td>
+</tr>
+<tr>
+<td><strong>上 0–120 行（纯背景：地面/椅子/人）</strong></td>
+<td style="text-align: right;"><strong>0.0295</strong></td>
+<td style="text-align: right;"><strong>2.52×</strong></td>
+</tr>
+<tr>
+<td>中 180–300 行（桌面 + 笔筒 + 两支笔）</td>
+<td style="text-align: right;">0.0234</td>
+<td style="text-align: right;">2.00×</td>
+</tr>
+<tr>
+<td>下 360–480 行（两条机械臂）</td>
+<td style="text-align: right;">0.0264</td>
+<td style="text-align: right;">2.26×</td>
+</tr>
+<tr>
+<td>整个头相机涂灰</td>
+<td style="text-align: right;">0.0627</td>
+<td style="text-align: right;">5.36×</td>
+</tr>
+<tr>
+<td>wrist_L 涂灰</td>
+<td style="text-align: right;">0.0479</td>
+<td style="text-align: right;">4.09×</td>
+</tr>
+<tr>
+<td>wrist_R 涂灰</td>
+<td style="text-align: right;">0.0379</td>
+<td style="text-align: right;">3.24×</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>遮挡"与任务无关的背景"比遮挡"任务物体所在的桌面"伤害更大（2.52× vs 2.00×）。</strong>
+（限定：任何遮挡都会把输入推出分布，故这些倍数是依赖强度的<strong>上界</strong>；但三个条带尺寸与退化方式相同，
+相互之间的比较是公平的，且排序"背景 &gt; 手臂 &gt; 桌面物体"在 <code>+fail72</code> 权重上完全一致：2.13× / 2.02× / 1.84×。）</p>
+<p><strong>表 36｜失败会话的视觉可分性（头相机顶部背景带平均亮度）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">mean</th>
+<th style="text-align: right;"><strong>std</strong></th>
+<th style="text-align: right;">单标量分离准确率</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>成功集</td>
+<td style="text-align: right;">88.8</td>
+<td style="text-align: right;"><strong>25.4</strong></td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td>失败集</td>
+<td style="text-align: right;">75.9</td>
+<td style="text-align: right;"><strong>5.9</strong></td>
+<td style="text-align: right;"><strong>0.669</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>综合机制</strong>：策略的头相机通路主要锚定于<strong>场景/场次上下文</strong>而非物体；失败集在视觉上近乎常量块，
+单标量即可 66.9% 分开两集。因此新增一个背景可辨识的会话块，等于给策略递了一个免费的模式选择捷径——
+它无需解决动作冲突，只需学会"看到某背景 → 走某模式"。训练时天衣无缝，
+部署时该捷径特征处于 OOD，模式选择退化为随机。而 <code>n_action_steps=100</code> 且
+<code>temporal_ensemble_coeff=None</code> 意味着<strong>一次选错模式 = 3.33 秒的开环盲走</strong>，
+决定了后果是"轻微抖动"还是"整条 episode 报废"。</p>
+<p>非马尔可夫性为次要因素：状态重访率成功集 0.0015 / 失败集 0.0011，
+重访点动作 chunk MAE 0.0436 vs 0.0703（1.6×），远小于 §8.3 的 18×。
+<strong>本批数据的冲突主要是跨 episode / 跨会话的，不是同 episode 内历史依赖的</strong>，
+故"加历史帧"不是本问题的主药方。</p>
+<hr />
+<h2 id="9">9. 跨线综合讨论</h2>
+<h3 id="91">9.1 有效与无效的杠杆</h3>
+<p><strong>表 37｜按实测效应量排序的变量</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>变量</th>
+<th>度量口径</th>
+<th>效应量</th>
+<th>证据强度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temporal_ensemble_coeff</code>（0.01 vs −0.05）</td>
+<td>真机成功率</td>
+<td><strong>−30 点</strong></td>
+<td>p = 4.0e-5，3/3 复现</td>
+</tr>
+<tr>
+<td>部署 K=40 Hermite 桥</td>
+<td>离线 MAE</td>
+<td>+5.1%–+7.8%（act_eef）；+12.4%–+13.5%（patch）</td>
+<td>逐级消融，五份权重一致</td>
+</tr>
+<tr>
+<td>chunk 模式重规划频率（每 60 帧）</td>
+<td>离线 MAE</td>
+<td><strong>2.0×–2.2×</strong></td>
+<td>五份权重一致</td>
+</tr>
+<tr>
+<td>动作表示（相对 vs 绝对）</td>
+<td>留出集 MAE</td>
+<td><strong>1.83×</strong></td>
+<td>单数据集，31 集留出</td>
+</tr>
+<tr>
+<td>权重（533 vs 616 系）</td>
+<td>真机成功率</td>
+<td>−20 点</td>
+<td>p = 0.049（含 505 合并）</td>
+</tr>
+<tr>
+<td>checkpoint（200k vs 100k）</td>
+<td>真机成功率</td>
+<td>+10 点</td>
+<td>p = 0.168，3/3 同向</td>
+</tr>
+<tr>
+<td>训练数据量（363 → 616 集）</td>
+<td>离线 MAE</td>
+<td><strong>7.4% 全跨度</strong>（含约 2% 噪声）</td>
+<td>四份权重</td>
+</tr>
+<tr>
+<td>加失败数据（0% → 18.5% 帧）</td>
+<td>离线 MAE</td>
+<td>+10%，250k 归零</td>
+<td>三份权重；<strong>闭环未测</strong></td>
+</tr>
+<tr>
+<td>训练步数后 100k（act_delta）</td>
+<td>留出集 MAE</td>
+<td><strong>+0.4%（零收益）</strong></td>
+<td>单对照</td>
+</tr>
+<tr>
+<td>编解码器层数</td>
+<td>单帧推理</td>
+<td>6.83 → 10.98 ms（11 组全部 &lt; 11 ms）</td>
+<td>11 组配置</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>结论</strong>：本任务线上最大的可操作效应集中在<strong>推理侧聚合方式与部署链路改写</strong>，
+其次是<strong>动作表示</strong>；训练数据量与模型容量在当前区间内均不是有效杠杆。</p>
+<h3 id="92">9.2 记忆与泛化的分离</h3>
+<p>四条独立证据一致：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>证据</th>
+<th>记忆侧</th>
+<th>泛化侧</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>act_delta</code> 后 100k 步</td>
+<td>in-sample −30%</td>
+<td>留出集 +0.4%</td>
+</tr>
+<tr>
+<td><code>acteef</code> 训练曲线</td>
+<td>训练 loss 持续降</td>
+<td>留出 MAE 在 100k 后单调升 3.5%</td>
+</tr>
+<tr>
+<td><code>acteef_533</code> 在其独有 67 集上</td>
+<td>0.01031 / 7.23× null</td>
+<td>616 未见时 0.03175 / 2.35× null</td>
+</tr>
+<tr>
+<td>失败数据三组</td>
+<td>训练 loss 0.040–0.042 三者相同</td>
+<td>未见的后 36 条 0.0516（4.3×）</td>
+</tr>
+</tbody>
+</table></div>
+<p>但<strong>真机在 <code>act_eef</code> 上给出相反方向</strong>（200k 优于 100k，3/3 同向）。
+二者可同时成立：离线留出 MAE 与真机成功率是不同的量（表 19，ρ = −0.949）。
+<code>MASTER-LEDGER §0</code> 第 3 条"后 100k 步没有价值"这一<strong>推论</strong>被真机推翻，
+而其依据的测量（held-out MAE 变差）本身未被推翻。</p>
+<h3 id="93">9.3 离线指标的效度分层</h3>
+<p><strong>表 38｜指标 × 归约的适用性矩阵</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>replan_1</code></th>
+<th><code>ens_*</code>（真机在跑）</th>
+<th><code>chunk_*</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>平坦 14 维 MAE</td>
+<td>可比权重（无滞后）</td>
+<td><strong>不可用</strong>（量的是滞后，ρ = −0.95）</td>
+<td><strong>不可用</strong>（量的是不执行的链）</td>
+</tr>
+<tr>
+<td>末端位置 mm</td>
+<td><strong>可用，本轮押对</strong></td>
+<td>不可用（ρ = −0.95）</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td>acc@0.25σ</td>
+<td>可用</td>
+<td>不可用</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td>二阶差分</td>
+<td>读原始抖动（4.1× demo）</td>
+<td><strong>本轮唯一押对的一栏</strong></td>
+<td>读桥的收益</td>
+</tr>
+<tr>
+<td>plan consistency</td>
+<td>架构级筛子</td>
+<td>同左</td>
+<td>同左</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>plan consistency</code>（<code>|A_{t+1}[i] − A_t[i+1]|</code>，不使用任何 ground truth）
+在架构层面分辨力强：<code>act_eef</code> 三份为 0.00266–0.00271，patch 两份为 0.00706–0.00821（<strong>2.7–3.1 倍</strong>），
+与二阶差分（4.1× demo vs 16–20× demo）给出一致结论；
+但作为同架构权重筛子过钝（跨度 1.8%，噪声 0.43%）。</p>
+<hr />
+<h2 id="10">10. 效度威胁与未测项</h2>
+<h3 id="101">10.1 效度威胁（按严重度）</h3>
+<ol>
+<li><strong>真机实验协议完全未知</strong>（最大单一威胁）。任务定义、成功判据、每次试验的初始摆放随机化方式、
+   16 格的测试顺序、操作者是否盲测——全部未记录。若 16 格按表格顺序连续跑，
+   则"权重"与"时间/场地漂移/操作者熟练度"完全共线，§5.1 中 533 = 60% 存在无法排除的替代解释。
+   <strong>澄清成本为零（一句话），但它决定该条结论是否成立。</strong></li>
+<li><strong>平滑度不是被证实的预测器</strong>。ρ = +0.973 建立在 5 个点、2 个自由度上，
+   且其在跨权重段的离线跨度仅 6.7%（0.000210 vs 0.000224），需先证明 6.7% 的离线跨度
+   对应得上 20 点的真机跨度。未证明。</li>
+<li><strong><code>ens_*</code> 与成功率之间仍无任何被验证的离线预测器</strong>。本轮做的是<strong>排除</strong>（四项准确度指标出局），
+   剩下一个候选，不是结论。</li>
+<li><strong>N_eff 机制未分离</strong>（§5.2）：三个共变量，两个数据点。</li>
+<li><strong><code>acteef_505</code> 无 TE 模式离线数字</strong>，§5.5 的倒挂比较基于已知量错对象的 chunk 链。</li>
+<li><strong><code>533</code> vs 其余三份的 p = 0.049 依赖是否将 <code>acteef_505</code> 并入</strong>。505 是不同训练集，
+   合并它是一个<strong>假设</strong>而非事实；仅用两份孪生时 p = 0.075。</li>
+<li><strong><code>616_eef_actionsame</code> 的污染指纹从未独立核对</strong>——其数据集不在本机，
+   去污染使用 <code>batch_success_616_eef</code> 作替身（两份 checkpoint 归一化统计量逐位相同）。</li>
+<li><strong><code>act_delta</code> 与失败数据两条线均为单数据集、单任务结论</strong>，未做跨任务复现。</li>
+<li><strong>训练侧与部署侧存在三份不同步的 lerobot 代码副本</strong>，且 <code>job.json</code> 无任何代码版本字段。
+   <code>act_delta</code> 第二轮的 <code>use_relative_actions</code> 开关是在 <code>site-packages</code> 手工编辑的 dataclass 默认值，
+   <strong>重跑同一 sbatch 会静默退回绝对动作</strong>。任何"改了 X 之后效果变了"的结论在此前提下都不可信。</li>
+</ol>
+<h3 id="102">10.2 明确未测（不得当作已测）</h3>
+<ul>
+<li><strong>真闭环离线评测</strong>。全部离线轮次均为 teacher-forced：每帧观测来自示教数据集，
+  不是机械臂实际所在之处。抓取失败后的恢复始终量不到。</li>
+<li><strong>TE 滞后的直接测量</strong>。表 17 的滞后为按示教每帧位移（0.002599）反算的量级估计。
+  直接做法（将执行轨迹对平移 k 帧的示教打分、扫 k 找最小值）未做。</li>
+<li><strong><code>533_eef</code> / <code>361_eef</code> 的训练曲线</strong>。checkpoint 不存在，不可补。</li>
+<li><strong><code>dec_layers ∈ {1, 4, 7}</code> 的正式消融</strong>（R1 §3.4 提出，至今未跑）。</li>
+<li><strong>相机身份嵌入</strong>（<code>act-camera-embedding.patch</code> 已就绪，未训练、未评测）。</li>
+<li><strong>失败数据三组的闭环成功率</strong>（<code>env_eval_freq = 0</code>，无任何 rollout 记录）。</li>
+<li><strong><code>act_delta</code> 在 batch7（163 条）上的重训</strong>（job 存在，从未评测）。</li>
+<li><strong>部署图像通路的 train/deploy 失配</strong>：训练读视频帧，部署读 JPEG q90 且头部图用 <code>INTER_AREA</code> 缩放。</li>
+<li><strong>夹爪观测越界</strong>（实测 gL 读到 1.209–1.233，训练范围 [0,1]；发送侧有 clip、接收侧无），
+  跨两轮 <code>act_delta</code> 审计均未修复。</li>
+</ul>
+<hr />
+<h2 id="11_1">11. 建议</h2>
+<p>按"证据支撑 × 实施成本"排序。</p>
+<h3 id="111">11.1 立即可做（零训练成本）</h3>
+<ol>
+<li><strong>保持 <code>temporal_ensemble_coeff = 0.01</code>。</strong> 唯一达到统计显著的结论（p = 4.0e-5）。
+   下一个应测的是 <strong><code>coeff = 0</code></strong>：其在三份权重、每一个离线指标（含唯一未被证伪的平滑度）上
+   均优于 0.01（表 12），N_eff 为最大值 100，滞后 1.65 s 反而更小。
+   <strong>两把尺子同向、离线已算好、改一行 YAML、30 次试验。</strong></li>
+<li><strong><code>coeff = +0.05</code> 作为判别实验。</strong> 其 N_eff 与 −0.05 相同（39.5），仅滞后与视野方向相反：
+   若也降至约 50% → 机制是平均次数，<code>coeff = 0</code> 即最优点，实验到此为止；
+   若仍在 80% 附近 → 机制是视野方向，值得继续往正方向扫。一份权重 30 次即可。</li>
+<li><strong>补 <code>acteef_533 @ −0.05</code> 一格（30 次）。</strong> 用以判定 −30 点是否为与权重无关的固定代价。
+   若可加，则系数效应与权重效应可独立引用；若存在交互，表 16 的 p = 0.049 需重算。</li>
+<li><strong>补记真机协议一句话</strong>：测试顺序、成功判据、初始摆放是否随机化、是否盲测。
+   零成本，但它决定 §5.1 结论是否站得住。</li>
+<li><strong>修 <code>bridge_steps</code>，或下线 chunk 模式。</strong> <code>min(40, chunk.shape[0])</code> 应在 chunk 短于 K 时不建桥，
+   而非把整条 chunk 变成桥。若 TE 即是答案，该路径可直接下线。</li>
+<li><strong>修正 <code>MASTER-LEDGER §0</code> 第 1 条</strong>：真机口径上 <code>acteef_533</code> 已有三个反例。</li>
+</ol>
+<h3 id="112">11.2 部署配置</h3>
+<ol>
+<li><strong>将 <code>deploy_config_eef.yaml</code> 自 <code>acteef_533</code> 换出。</strong> 三份 80% 权重中优先 <strong><code>acteef_616as</code></strong>：
+   它在唯一未被证伪的指标（TE 二阶差分 0.000210）上是三份中最好的，且有孪生 <code>acteef_616</code> 可随时复核。
+   <code>acteef_505</code> 同为 80% 但无 TE 模式离线数字，换它等于放弃离线交叉验证。
+   <strong>换出的理由是末端位置 mm 与右夹爪 MAE，不是平坦 MAE。</strong></li>
+<li><strong><code>act_delta</code> 线保留 <code>n_action_steps = 50</code></strong>（免费、无副作用、方向正确），但不应对其抱有期待。</li>
+</ol>
+<h3 id="113">11.3 评测方法论</h3>
+<ol>
+<li><strong>离线主表改为三栏</strong>：<code>replan_1</code> 的末端位置 mm（无滞后能力代理，本轮押中）；
+   <code>ens_&lt;在用系数&gt;</code> 的二阶差分（唯一未被证伪，ρ = +0.973）；
+   <code>plan consistency</code>（架构级筛子，同架构选权重时不用）。
+   <strong>删除平坦 14 维 MAE 作为主排序键</strong>——两份报告给出两条独立理由（表 19 的 ρ = −0.949；
+   表 14 的尺度与信息量双重失衡）。</li>
+<li><strong>今后每个 job 都保存中间步 checkpoint。</strong> <code>save_freq</code> 自 50000 调至 10000 的存储代价，
+    远小于"想比较时发现 checkpoint 不存在"（<code>533_eef</code> / <code>361_eef</code> 已因此永久失去训练曲线）。</li>
+<li><strong>不要为 200k vs 100k 追加试验。</strong> 10 点差、3/3 同向已足够决策（用 200k）；
+    做成 p &lt; 0.05 需每格约 300 次。<strong>用方向，不买 p 值。</strong></li>
+<li><strong>训练侧改为 editable 安装指向 <code>lerobot_vlahost</code>，或在 <code>job.json</code> 记录 git commit。</strong>
+    不做这一步，后续所有"改了 X 效果变了"的结论都不可信。</li>
+<li><strong>在 <code>save_checkpoint</code> 写入 <code>arch_version</code> 字段并在部署脚本校验</strong>，
+    以规避 <code>[0]</code>/<code>[-1]</code> 这类静默的 checkpoint 破坏性变更。</li>
+</ol>
+<h3 id="114">11.4 训练侧</h3>
+<ol>
+<li><strong>停止把"加数据量"当作 <code>act_eef</code> 的杠杆</strong>（363 → 616 集仅换来 7.4% 离线跨度，其中约 2% 是噪声）。
+    数据配方（哪些 episode）比数据量更像变量，但即使是配方本轮也未量出可靠的方向性收益。</li>
+<li><strong>失败/纠错数据在当前形式下不应加入。</strong> 不是因为失败数据有毒，而是它同时携带三样无关负载：
+    独立采集会话块（视觉捷径）、同状态 18× 动作分歧、系统性更长的 episode。
+    若要加：要么降至 ≤ 5% 帧且只保留纠错片段，要么加条件化后拉至 20%–50% 并按 IWR 加权；
+    中间地带无价值。采集时<strong>不要单独攒一个失败批次</strong>（须与成功数据同场次交替采集），
+    <strong>把标签写进数据</strong>（当前六个数据集 task 全为 <code>"Unspecified task"</code>），
+    <strong>失败数据须来自策略自身的失败</strong>而非人工演示的失败。</li>
+<li><strong><code>act_delta</code> 若继续，先用 batch7（163 条）重训并切出验证集</strong>，用留出 MAE 选 checkpoint 而非 <code>last</code>。</li>
+<li><strong><code>dec_layers ∈ {1, 4, 7}</code> 消融应尽快补上</strong>。在拿到该组数据前，<code>dec_layers = 1</code> 是风险更低的默认值
+    （同时匹配上游 ACT 与 LeRobot）。若要加深，<strong>先补相机身份嵌入再谈加深 encoder</strong>——
+    当前每路相机的 2D 正弦位置编码都从原点重新开始，模型须先从内容与拼接顺序中"猜"出视角身份。</li>
+<li><strong>拆分 <code>enc_layers</code></strong> 为 <code>n_encoder_layers</code> / <code>n_vae_encoder_layers</code>：
+    CVAE style encoder 在推理时完全不运行，与 obs encoder 绑定调参是纯浪费（训练侧每层 13.3 ms / 0.93 GB）。</li>
+</ol>
+<hr />
+<h2 id="a">附录 A 指标定义</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>定义</th>
+<th>单位</th>
+<th>本轮判决</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MAE（平坦 14/16 维）</strong></td>
+<td><code>mean｜pred − gt｜</code> over (step, dim)</td>
+<td><strong>混合单位</strong></td>
+<td><strong>ρ = −0.949，弃用为主排序键</strong></td>
+</tr>
+<tr>
+<td><code>norm_mae</code></td>
+<td>每维先除以该维动作 std 再平均</td>
+<td>无量纲</td>
+<td>未单独对照</td>
+</tr>
+<tr>
+<td>RMSE</td>
+<td>同 MAE 但平方</td>
+<td>混合</td>
+<td>与 MAE 同向</td>
+</tr>
+<tr>
+<td><code>tail_ratio</code></td>
+<td><code>norm_rmse / norm_mae</code></td>
+<td>无量纲，越大尾巴越重</td>
+<td>未单独对照</td>
+</tr>
+<tr>
+<td><strong>acc@τσ</strong></td>
+<td><code>(step, joint)</code> 对中 <code>｜err｜ ≤ τ·σ_joint</code> 的比例，τ ∈ {0.1, 0.25, 0.5, 1.0}，逐维用各自 σ</td>
+<td>比例</td>
+<td><strong>ρ = −0.949</strong></td>
+</tr>
+<tr>
+<td><strong>末端位置误差</strong></td>
+<td>两臂末端欧氏距离误差，经 MJCF 正运动学（<code>tr_joint_to_eef.py</code>，与生成 EEF 数据集同一份）</td>
+<td>mm</td>
+<td><strong><code>replan_1</code> 下押对；<code>ens_*</code> / <code>chunk_*</code> 下 ρ = −0.949</strong></td>
+</tr>
+<tr>
+<td><strong>末端姿态误差</strong></td>
+<td>四元数<strong>测地角</strong>（非欧拉角之差，后者在 π 处 wrap、近万向锁病态）</td>
+<td>rad / deg</td>
+<td><strong>ρ = −0.949</strong></td>
+</tr>
+<tr>
+<td><strong>二阶差分</strong></td>
+<td>执行轨迹 <code>mean｜x[t+2] − 2x[t+1] + x[t]｜</code>，逐 (step, dim)。<strong>MAE 看不见该量，而它正是 TE 存在的理由</strong></td>
+<td>混合，<strong>须除以示教自身的 0.000716 来读</strong></td>
+<td><strong>ρ = +0.973，唯一未被证伪</strong></td>
+</tr>
+<tr>
+<td>一阶差分</td>
+<td>同上的 <code>mean｜x[t+1] − x[t]｜</code>；示教为 0.002599/帧</td>
+<td>混合</td>
+<td>用于滞后反算</td>
+</tr>
+<tr>
+<td><strong>plan consistency</strong></td>
+<td><code>｜A_{t+1}[i] − A_t[i+1]｜</code>，两行指同一绝对时刻。<strong>不使用任何 ground truth</strong></td>
+<td>混合</td>
+<td>架构级筛子；同架构选权重过钝</td>
+</tr>
+<tr>
+<td><strong>真机成功率</strong></td>
+<td>二值成败，30 次/格</td>
+<td>%</td>
+<td><strong>本轮的裁判</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="b">附录 B 空基线定义</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>基线</th>
+<th>定义</th>
+<th>h60（09-06）</th>
+<th>h1（09-07）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hold_state</code></td>
+<td>命令 = 当前实测位姿</td>
+<td>MAE 0.08216 / 26.53 mm / 7.89°</td>
+<td>MAE 0.02091 / 12.65 mm / 3.17°</td>
+</tr>
+<tr>
+<td><code>train_mean</code></td>
+<td>命令 = 训练集动作均值（常量）</td>
+<td>MAE 0.22681</td>
+<td>MAE 0.22573 / 87.20 mm / 38.50°</td>
+</tr>
+<tr>
+<td>人类示教</td>
+<td>示教轨迹自身的平滑度</td>
+<td>—</td>
+<td>二阶差分 0.000716，一阶 0.002599</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>hold_state</code> 在 h1 上强得反直觉（0.02091，仅比 <code>replan_1</code> 差 24%），因为 30 fps 下相邻帧动作差本就很小。
+由此得出：策略的<strong>姿态</strong>预测仅比"照抄当前位姿"好 1.05×，位置好 1.33×——
+<strong>主导平坦 MAE 的 6 个姿态维，正是策略几乎没有优势的维</strong>。这是 ρ = −0.949 的机制解释之一。</p>
+<h2 id="c">附录 C 复现入口</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>轮次</th>
+<th>脚本 / run 目录</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09-06 chunk 口径</td>
+<td><code>eval_policy/runs/20260906_acteef_616_baseline/</code>（<code>tables.md</code> 为该轮全部数字的唯一来源）</td>
+</tr>
+<tr>
+<td>09-07 TE 口径</td>
+<td><code>eval_policy/runs/20260908_temporal_ensembling/</code>（<code>ensemble_eval.py</code> + <code>results/*.json</code>）</td>
+</tr>
+<tr>
+<td><code>act_delta</code> batch5 审计</td>
+<td><code>experiment_report/scripts_act_delta_audit/audit_act_delta_batch5.py</code></td>
+</tr>
+<tr>
+<td><code>act_delta</code> rel100 审计</td>
+<td><code>experiment_report/scripts_act_delta_audit/audit_act_delta_rel100.py</code>（含 GPU 留出评估，约 30 分钟）</td>
+</tr>
+<tr>
+<td>失败数据消融</td>
+<td><code>experiment_report/scripts_fail_data/</code>（<code>locate.py</code> / <code>phase.py</code> / <code>conflict.py</code> / <code>revisit.py</code> / <code>eval2.py</code> / <code>eval3.py</code> / <code>eval4.py</code>）</td>
+</tr>
+<tr>
+<td>层数扫描</td>
+<td>R1 附录复现脚本</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>act_delta</code> 与失败数据脚本须使用 <code>envs/lerobot</code> 环境（base env 的 pandas 与 numpy 2.x 不兼容）。
+<code>ACTPolicy.predict_action_chunk()</code> 在 lerobot 0.6 中不做归一化也不做反归一化，
+必须自行套用 <code>make_pre_post_processors(cfg, pretrained_path=...)</code>，否则将得到约 0.9 rad 的错误数值（较真值大 60 倍）。</p>
+<hr />
+<p><em>本报告为二次汇编，不含新测量。全部数值可回溯至 §1.4 所列原始报告。</em></p>
+</div></body></html>
