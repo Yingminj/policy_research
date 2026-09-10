@@ -48,8 +48,10 @@ em{color:var(--muted)}
 <strong>时间跨度</strong> 2026-08-07 — 2026-09-08
 <strong>汇编日期</strong> 2026-09-09
 <strong>汇编范围</strong> <code>policy/experiment_report/act/</code> 下全部十份原始报告与审计记录
-<strong>性质</strong> 二次汇编。本报告不产生任何新测量，全部数值均可回溯至下节所列的原始报告与 run 目录；
-凡与原始报告有出入之处，以原始报告为准。</p>
+<strong>性质</strong> 二次汇编 + 一节一手测量。除 <strong>§2.3</strong> 外，本报告不产生新测量，全部数值均可回溯至
+下节所列的原始报告与 run 目录；凡与原始报告有出入之处，以原始报告为准。
+<strong>§2.3（动作—状态一致性与关节限位工况）为 2026-09-09 的补测</strong>，直接读数据集 parquet，
+不依赖任何原始报告，脚本见附录 C.4。</p>
 <hr />
 <h2 id="_1">摘要</h2>
 <p>本报告汇总 <code>act</code>（16 维关节动作空间）与 <code>act_eef</code>（14 维末端位姿动作空间）两条策略线在
@@ -72,12 +74,24 @@ em{color:var(--muted)}
    <code>act_delta</code> 的后 100k 步留出误差变化 +0.4%（表 27）；<code>act_eef</code> 三条训练曲线一致在
    50k–100k 触底后单调变差（表 7）。但真机结果在 <code>act_eef</code> 上与该结论方向相反（200k 优于 100k，3/3 同向，p = 0.168），
    说明"离线留出误差"与"真机成功率"是两个不同的量，可同时成立。</li>
-<li><strong>部署链路改写的量级超过全部架构改动。</strong> K = 40 三次 Hermite 桥单级即造成 +5.1%–+7.8% 的 MAE 代价（表 5），
+<li>
+<p><strong>部署链路改写的量级超过全部架构改动。</strong> K = 40 三次 Hermite 桥单级即造成 +5.1%–+7.8% 的 MAE 代价（表 5），
    而部署栈其余四级合计仅 −0.6%–−1.2%（轻微改善）。在 <code>chunk</code> 模式下 <code>n &lt; 40</code> 时该桥存在硬编码缺陷，
-   使任意权重均无法前进（§5.4）。</li>
+   使任意权重均无法前进（§5.4）。</p>
+</li>
+<li>
+<p><strong>训练数据中存在三个未记录的关节硬钳位工况，且评测集不覆盖其中之一。</strong>
+   <code>J6_L @ +π/3</code>、<code>J7_L @ −π/2</code>、<code>J6_R @ +π/3</code> 三处限位使 12.5% / 1.8% / 7.5% 的指令帧被钉死，
+   <code>J7_L</code> 撞限位后从臂失速达数百帧。该工况使 <code>mean|action − state|</code> 在关节空间抬高 3.2 倍、
+   经正运动学放大后在 EEF 空间抬高 7.5 倍（表 3b、3e）。排除三个限位接近区后，
+   <code>action[t] ≈ state[t+3]</code>，残差降至 <strong>0.13°（关节）/ 1.2 mm + 0.3°（末端）</strong>，
+   较策略自身误差低一个数量级。<strong>两个评测集均不含 <code>J7_L</code> 触限 episode</strong>，
+   故现行离线尺子在一个可测量的具体维度上比训练分布更容易（§2.3.7）。</p>
+</li>
 </ol>
 <p><strong>统一建议</strong>：以 <code>replan_1</code> 归约下的末端位置误差与 <code>ens_&lt;在用系数&gt;</code> 归约下的二阶差分作为离线主排序键，
-弃用平坦 14 维 MAE；保持 <code>temporal_ensemble_coeff = 0.01</code>；部署权重自 <code>acteef_533</code> 换至 616 系。</p>
+弃用平坦 14 维 MAE；保持 <code>temporal_ensemble_coeff = 0.01</code>；部署权重自 <code>acteef_533</code> 换至 616 系；
+补一个含左腕触限工况的第二评测集（§11.3）。</p>
 <hr />
 <div class="toc"><span class="toctitle">目录</span><ul>
 <li><a href="#_1">摘要</a></li>
@@ -91,6 +105,7 @@ em{color:var(--muted)}
 <li><a href="#2-act_eef">2. act_eef 线：权重与训练数据</a><ul>
 <li><a href="#21">2.1 权重清单</a></li>
 <li><a href="#22">2.2 训练集之间不是包含关系</a></li>
+<li><a href="#23">2.3 动作—状态一致性与关节限位工况</a></li>
 </ul>
 </li>
 <li><a href="#3-act_eef-chunk-horizon-60">3. act_eef 离线结果（一）：chunk 口径，horizon 60</a><ul>
@@ -252,6 +267,8 @@ em{color:var(--muted)}
 </tbody>
 </table></div>
 <p>空基线定义见附录 B。<code>hold_state</code> 表示"命令 = 当前实测位姿"，<code>train_mean</code> 表示"命令 = 训练集动作均值"。</p>
+<p>⚠️ <strong>该评测集不覆盖左腕触限工况</strong>（<code>J7_L @ −π/2</code>），而四个训练集均含该工况的 3% episode。
+<code>hold_state</code> 的 0.02091 中约四分之三来自限位与滞后而非模型无关的测量噪声。见 §2.3。</p>
 <h3 id="13">1.3 三把不可混用的尺子</h3>
 <p>三轮测试量的<strong>不是同一条链、不是同一个 horizon、不是同一批样本</strong>。跨轮次比较绝对值无效。</p>
 <p><strong>表 1｜三轮测试的对应关系</strong></p>
@@ -468,6 +485,532 @@ em{color:var(--muted)}
 <p><strong>越界率</strong>：以各自训练集 MIN_MAX 盒计，505 / 533 / 616 三个盒子对本评测集完全等价
 （越界 98 帧，占 0.24%，最大越界 0.0301，通道 <code>eef_r_x</code>）；361 为 156 帧 / 0.39%。
 <strong>权重之间的精度差异不能归因于归一化差异。</strong></p>
+<h3 id="23">2.3 动作—状态一致性与关节限位工况</h3>
+<p><strong>本节为本报告唯一的一手测量</strong>（2026-09-09 补测），非二次汇编。全部数字由
+<code>scan{3,5,9,12,13}.py</code> 直接读 parquet 得出，覆盖 12 个数据集 / 约 260 万帧，
+脚本与原始输出见附录 C。补测的动因是解释 §4.4 的"平坦 MAE 近似为左腕姿态指标"这一现象。</p>
+<h4 id="231-action-observationstate">2.3.1 <code>action</code> 与 <code>observation.state</code> 的名义关系</h4>
+<p>数据集中 <code>action</code> 是<strong>指令目标</strong>，<code>observation.state</code> 是<strong>实测位姿</strong>，二者不等价：
+空基线 <code>hold_state</code> 在 horizon 1 上的 MAE 0.02091（表 12）即此二者之差，
+不含任何模型成分。将其分解可知它由三部分构成——执行滞后、关节限位饱和、测量噪声——
+而三者的量级相差一个数量级以上。</p>
+<p><strong>执行滞后</strong>：在每条 episode 内将 <code>action[t]</code> 对 <code>state[t+k]</code> 逐 k 打分取最小，
+全部 12 个位姿维、全部 12 个数据集、两个动作空间给出一致的 <strong>k* = 3 帧 ≈ 100 ms</strong>；
+两个夹爪通道 k* = 0（夹爪指令即状态，残差 4 × 10⁻⁵）。</p>
+<h4 id="232">2.3.2 三个硬钳位</h4>
+<p>对指令通道逐维检测极值处的质量堆积（指令落在极值 ±10⁻³ 内的帧占比），
+<code>batch_success_616</code> 上检出<strong>三个硬钳位</strong>：</p>
+<p><strong>表 3a｜指令通道上的硬钳位（<code>batch_success_616</code>）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>关节</th>
+<th>钳位端</th>
+<th style="text-align: right;">钳位值</th>
+<th style="text-align: right;">指令被钉住的帧</th>
+<th>性质</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>J6_L</code></td>
+<td>上限</td>
+<td style="text-align: right;"><strong>+1.0472 = +π/3</strong></td>
+<td style="text-align: right;"><strong>12.45%</strong></td>
+<td>短促触顶，<code>abs(gap) &gt; 0.2</code> 的帧为 0.00%</td>
+</tr>
+<tr>
+<td><code>J7_L</code></td>
+<td>下限</td>
+<td style="text-align: right;"><strong>−1.5708 = −π/2</strong></td>
+<td style="text-align: right;">1.82%</td>
+<td><strong>长时失速</strong>，撞限位后卡在 −0.93 rad 达数百帧</td>
+</tr>
+<tr>
+<td><code>J6_R</code></td>
+<td>上限</td>
+<td style="text-align: right;">+1.0472 = +π/3</td>
+<td style="text-align: right;">7.48%</td>
+<td>与 <code>J6_L</code> 同限位，但评测集亦覆盖</td>
+</tr>
+<tr>
+<td><code>gL</code> / <code>gR</code></td>
+<td>双端</td>
+<td style="text-align: right;">0 / 1</td>
+<td style="text-align: right;">40–52%</td>
+<td><strong>设计如此</strong>，非缺陷</td>
+</tr>
+</tbody>
+</table></div>
+<p>三个值均为整齐的 π/3 与 π/2，属软件限位而非机械磨损。<code>J7_L</code> 的典型时序：</p>
+<pre><code>ep 128, Joint7_L
+    f   action    state     gap
+  570   -1.439   -0.937   -0.502
+  630   -1.435   -0.922   -0.513      指令贴近 -π/2，从臂停在 -0.93
+  675   -1.337   -0.862   -0.476      持续 100+ 帧
+  690   -0.685   -0.846   +0.160      指令退开后瞬间归位
+</code></pre>
+<p>19 个重灾 episode 的偏置<strong>全部为负</strong>（19 负 / 0 正），单侧性完全成立。
+<code>J6_L</code> 则表现为按指令角度的顶格效应，末位十分位跃升 13 倍：</p>
+<pre><code>J6_L |gap| 按指令角度十分位（batch_success_616）
+[-0.596,+0.399] 0.00499   中间七档 0.00270-0.00326   [+0.967,+1.047] 0.03862
+</code></pre>
+<h4 id="233">2.3.3 全族扫描</h4>
+<p><strong>表 3b｜12 个数据集的 <code>mean|action − state|</code>（k = 3，未做限位排除）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>数据集</th>
+<th style="text-align: right;">ep</th>
+<th style="text-align: right;">维</th>
+<th style="text-align: right;">flat</th>
+<th>最差维</th>
+<th style="text-align: right;">值</th>
+<th style="text-align: right;">该维重灾 ep</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>100_eval_eef</code></td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;"><strong>0.00620</strong></td>
+<td><code>eef_r_roll</code></td>
+<td style="text-align: right;">0.01402</td>
+<td style="text-align: right;"><strong>0/100</strong></td>
+</tr>
+<tr>
+<td><code>53_eval_data_eef</code></td>
+<td style="text-align: right;">53</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0.01759</td>
+<td><code>eef_l_roll</code></td>
+<td style="text-align: right;">0.07284</td>
+<td style="text-align: right;">2/53</td>
+</tr>
+<tr>
+<td><code>505_eef</code></td>
+<td style="text-align: right;">505</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0.01879</td>
+<td><code>eef_l_yaw</code></td>
+<td style="text-align: right;">0.09280</td>
+<td style="text-align: right;">73/505</td>
+</tr>
+<tr>
+<td><code>533_eef</code></td>
+<td style="text-align: right;">535</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0.01920</td>
+<td><code>eef_l_yaw</code></td>
+<td style="text-align: right;">0.09480</td>
+<td style="text-align: right;">84/535</td>
+</tr>
+<tr>
+<td><code>616_eef</code></td>
+<td style="text-align: right;">616</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0.01942</td>
+<td><code>eef_l_yaw</code></td>
+<td style="text-align: right;">0.09589</td>
+<td style="text-align: right;">100/616</td>
+</tr>
+<tr>
+<td><code>749_eef</code></td>
+<td style="text-align: right;">749</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0.01879</td>
+<td><code>eef_l_yaw</code></td>
+<td style="text-align: right;">0.09065</td>
+<td style="text-align: right;">106/749</td>
+</tr>
+<tr>
+<td><code>100_eval</code></td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;"><strong>0.00399</strong></td>
+<td><code>Joint6_R</code></td>
+<td style="text-align: right;">0.01519</td>
+<td style="text-align: right;"><strong>0/100</strong></td>
+</tr>
+<tr>
+<td><code>53_eval_data</code></td>
+<td style="text-align: right;">53</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.00785</td>
+<td><code>Joint7_L</code></td>
+<td style="text-align: right;">0.03919</td>
+<td style="text-align: right;"><strong>0/53</strong></td>
+</tr>
+<tr>
+<td><code>505</code></td>
+<td style="text-align: right;">505</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.00709</td>
+<td><code>Joint7_L</code></td>
+<td style="text-align: right;">0.05084</td>
+<td style="text-align: right;">13/505</td>
+</tr>
+<tr>
+<td><code>533</code></td>
+<td style="text-align: right;">535</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.00721</td>
+<td><code>Joint7_L</code></td>
+<td style="text-align: right;">0.05198</td>
+<td style="text-align: right;">16/535</td>
+</tr>
+<tr>
+<td><code>616</code></td>
+<td style="text-align: right;">616</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.00734</td>
+<td><code>Joint7_L</code></td>
+<td style="text-align: right;">0.05224</td>
+<td style="text-align: right;">19/616</td>
+</tr>
+<tr>
+<td><code>749</code></td>
+<td style="text-align: right;">749</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">0.00717</td>
+<td><code>Joint7_L</code></td>
+<td style="text-align: right;">0.05010</td>
+<td style="text-align: right;">19/749</td>
+</tr>
+</tbody>
+</table></div>
+<p>"重灾 ep"定义为该 episode 上该维的 <code>mean(action − state)</code> 绝对值 &gt; 0.2 rad。
+四个训练集比率一致（14–16% EEF / 3% 关节），且重灾 episode 在索引上完全打散
+（616 中分 53 段，平均长 1.9，最长 10，分布于 [5, 601] 全程），
+<strong>故不是某一次录制会话或某一批标定的问题，而是贯穿整个采集期的持续工况。</strong></p>
+<p><strong>EEF 转换放大该缺陷 5 倍。</strong> 单个腕滚关节的误差经正运动学同时投影到
+<code>l_roll</code>、<code>l_yaw</code>、<code>l_x</code> 三维（三者逐 episode 偏置互相关 <strong>0.996</strong>）：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">关节空间</th>
+<th style="text-align: right;">EEF 空间</th>
+<th style="text-align: right;">放大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>flat <code>abs(a − s)</code>（616）</td>
+<td style="text-align: right;">0.00734</td>
+<td style="text-align: right;">0.01942</td>
+<td style="text-align: right;"><strong>2.6×</strong></td>
+</tr>
+<tr>
+<td>重灾 episode</td>
+<td style="text-align: right;">19/616（3.1%）</td>
+<td style="text-align: right;">100/616（16.2%）</td>
+<td style="text-align: right;"><strong>5.3×</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>act_eef</code> 线对该工况的敏感度是 <code>act</code> 线的 5 倍。</strong> 这是两条线之间此前未记录的系统性差异。</p>
+<h4 id="234-j7_l">2.3.4 只排除 <code>J7_L</code> 不成立</h4>
+<p><strong>表 3c｜收紧 <code>J7_L</code> 排除阈值对各维 train/eval 比值的影响（<code>616</code> vs <code>100_eval</code>，关节空间）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th style="text-align: right;"><code>J7_L</code> 排除阈值</th>
+<th style="text-align: right;">保留帧</th>
+<th style="text-align: right;"><code>J6_L</code> 比值</th>
+<th style="text-align: right;"><code>J7_L</code> 比值</th>
+<th style="text-align: right;">flat 比值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">∞（不排除）</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;"><strong>5.75</strong></td>
+<td style="text-align: right;">7.24</td>
+<td style="text-align: right;">1.84</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;">93.6%</td>
+<td style="text-align: right;"><strong>5.82</strong></td>
+<td style="text-align: right;">3.59</td>
+<td style="text-align: right;">1.45</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">86.9%</td>
+<td style="text-align: right;"><strong>5.73</strong></td>
+<td style="text-align: right;">1.49</td>
+<td style="text-align: right;">1.23</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.08</td>
+<td style="text-align: right;">82.9%</td>
+<td style="text-align: right;"><strong>5.73</strong></td>
+<td style="text-align: right;">0.80</td>
+<td style="text-align: right;">1.17</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.02</td>
+<td style="text-align: right;">78.0%</td>
+<td style="text-align: right;"><strong>5.75</strong></td>
+<td style="text-align: right;">0.46</td>
+<td style="text-align: right;">1.14</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>J6_L</code> 的比值在整个扫描区间内不动。两者相互独立：逐 episode 偏置相关 <strong>−0.195</strong>；
+<code>J6_L</code> 异常帧全局占 14.4%，在"非 <code>J7_L</code> 饱和"帧上占 <strong>14.5%</strong>，条件概率等于边缘概率。</p>
+<h4 id="235">2.3.5 排除全部三个限位接近区</h4>
+<p>按"指令落在任一钳位值的边距 M 之内"构造掩码（排除<strong>接近区</strong>而非仅排除钉死帧，
+因 <code>J7_L</code> 撞限位后存在滞回，指令退开后从臂仍卡住）：</p>
+<p><strong>表 3d｜边距扫描（<code>616</code> vs <code>100_eval</code>，关节空间，train/eval 比值）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th style="text-align: right;">边距 M (rad)</th>
+<th style="text-align: right;">保留 train / eval</th>
+<th style="text-align: right;"><code>J6_L</code></th>
+<th style="text-align: right;"><code>J7_L</code></th>
+<th style="text-align: right;"><code>J6_R</code></th>
+<th style="text-align: right;"><strong>flat</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">82% / 86%</td>
+<td style="text-align: right;">2.67</td>
+<td style="text-align: right;">6.52</td>
+<td style="text-align: right;">0.89</td>
+<td style="text-align: right;">1.83</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.05</td>
+<td style="text-align: right;">73% / 81%</td>
+<td style="text-align: right;">1.51</td>
+<td style="text-align: right;">6.40</td>
+<td style="text-align: right;">1.14</td>
+<td style="text-align: right;">1.77</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.10</td>
+<td style="text-align: right;">66% / 79%</td>
+<td style="text-align: right;">1.35</td>
+<td style="text-align: right;">6.62</td>
+<td style="text-align: right;">1.15</td>
+<td style="text-align: right;">1.66</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.20</td>
+<td style="text-align: right;">48% / 65%</td>
+<td style="text-align: right;">1.38</td>
+<td style="text-align: right;">4.49</td>
+<td style="text-align: right;">1.16</td>
+<td style="text-align: right;">1.34</td>
+</tr>
+<tr>
+<td style="text-align: right;"><strong>0.30</strong></td>
+<td style="text-align: right;"><strong>35% / 43%</strong></td>
+<td style="text-align: right;"><strong>1.44</strong></td>
+<td style="text-align: right;"><strong>1.47</strong></td>
+<td style="text-align: right;">1.10</td>
+<td style="text-align: right;"><strong>1.15</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>J6_L</code> 在 M = 0.05 即收敛，<code>J7_L</code> 需 M = 0.30，与二者"短促触顶"／"长时失速"的性质一致。</p>
+<h4 id="236">2.3.6 排除限位后的残差</h4>
+<p>在 M = 0.30 的掩码上<strong>重新拟合滞后</strong>（k* 仍为 3，掩码不改变滞后估计）：</p>
+<p><strong>表 3e｜限位排除后的 <code>action − state</code> 残差（<code>batch_success_616</code>）</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th style="text-align: right;">掩码内 k=0</th>
+<th style="text-align: right;">k*=3</th>
+<th style="text-align: right;">残余偏置</th>
+<th style="text-align: right;">残余 std</th>
+<th style="text-align: right;">偏置占比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>J1_L</code></td>
+<td style="text-align: right;">0.01254</td>
+<td style="text-align: right;">0.00223</td>
+<td style="text-align: right;">−0.00091</td>
+<td style="text-align: right;">0.00347</td>
+<td style="text-align: right;">41%</td>
+</tr>
+<tr>
+<td><code>J2_L</code></td>
+<td style="text-align: right;">0.00532</td>
+<td style="text-align: right;">0.00177</td>
+<td style="text-align: right;">+0.00007</td>
+<td style="text-align: right;">0.00234</td>
+<td style="text-align: right;">4%</td>
+</tr>
+<tr>
+<td><code>J3_L</code></td>
+<td style="text-align: right;">0.00753</td>
+<td style="text-align: right;">0.00143</td>
+<td style="text-align: right;">−0.00000</td>
+<td style="text-align: right;">0.00225</td>
+<td style="text-align: right;">0%</td>
+</tr>
+<tr>
+<td><code>J4_L</code></td>
+<td style="text-align: right;">0.00812</td>
+<td style="text-align: right;">0.00168</td>
+<td style="text-align: right;">−0.00070</td>
+<td style="text-align: right;">0.00236</td>
+<td style="text-align: right;">42%</td>
+</tr>
+<tr>
+<td><code>J5_L</code></td>
+<td style="text-align: right;">0.00980</td>
+<td style="text-align: right;">0.00236</td>
+<td style="text-align: right;">+0.00072</td>
+<td style="text-align: right;">0.00329</td>
+<td style="text-align: right;">30%</td>
+</tr>
+<tr>
+<td><code>J6_L</code></td>
+<td style="text-align: right;">0.01691</td>
+<td style="text-align: right;"><strong>0.00356</strong></td>
+<td style="text-align: right;">−0.00028</td>
+<td style="text-align: right;">0.00658</td>
+<td style="text-align: right;">8%</td>
+</tr>
+<tr>
+<td><code>J7_L</code></td>
+<td style="text-align: right;">0.01557</td>
+<td style="text-align: right;"><strong>0.00458</strong></td>
+<td style="text-align: right;">−0.00255</td>
+<td style="text-align: right;">0.01172</td>
+<td style="text-align: right;">56%</td>
+</tr>
+<tr>
+<td><code>J1_R</code> … <code>J7_R</code></td>
+<td style="text-align: right;">0.008–0.019</td>
+<td style="text-align: right;">0.00175–0.00382</td>
+<td style="text-align: right;">≤ 0.0013</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">9–56%</td>
+</tr>
+<tr>
+<td><code>gL</code> / <code>gR</code></td>
+<td style="text-align: right;">0.00004 / 0.00010</td>
+<td style="text-align: right;">同左（k* = 0）</td>
+<td style="text-align: right;">~0</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td><strong>flat（关节）</strong></td>
+<td style="text-align: right;">0.01122</td>
+<td style="text-align: right;"><strong>0.00231</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td><strong>flat（EEF）</strong></td>
+<td style="text-align: right;">0.00777</td>
+<td style="text-align: right;"><strong>0.00258</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table></div>
+<p>同一处理下 <code>100_eval</code>：关节 flat <strong>0.00201</strong>、EEF flat <strong>0.00206</strong>；train/eval 比 1.15 / 1.25。</p>
+<p>EEF 空间残差的物理量：<strong>位置 0.95–1.66 mm，姿态 0.21–0.37°</strong>（关节侧 0.00231 rad = 0.13°）。</p>
+<p>三条读数：</p>
+<p><strong>（a）左臂的"系统标定偏置"不存在。</strong> 未做限位排除时 <code>l_roll</code> / <code>l_yaw</code> 的逐 episode
+偏置为 −0.0789 / −0.0909 rad，占残差的 92%–95%，形态上极似固定坐标系偏置；
+排除限位后降至 <strong>−0.00073 / −0.00351</strong>，小两个数量级。该"偏置"是三个限位的平均效应，
+不是标定量。</p>
+<p><strong>（b）非限位帧上标签不是瓶颈。</strong> 残差与策略自身误差相差一个数量级：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">标签地板（限位排除后）</th>
+<th style="text-align: right;">策略误差（<code>replan_1</code>，表 12）</th>
+<th style="text-align: right;">比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>末端位置</td>
+<td style="text-align: right;">~1.2 mm</td>
+<td style="text-align: right;">9.27–9.52 mm</td>
+<td style="text-align: right;"><strong>8×</strong></td>
+</tr>
+<tr>
+<td>末端姿态</td>
+<td style="text-align: right;">~0.005 rad</td>
+<td style="text-align: right;">0.0527 rad</td>
+<td style="text-align: right;"><strong>10×</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>因此"标签噪声抬高 loss floor"仅在限位帧（约占 65% 掩码外的部分）上成立，
+在其余帧上不成立。</p>
+<p><strong>（c）残差的主体是滞后而非偏置。</strong> 掩码内 0.01122 → 0.00231，滞后消掉 <strong>79%</strong>；
+残余偏置在全部 30 个维度上均 ≤ 0.0035，无任何一维仍有可辨认的系统项。
+<strong>排除限位后 <code>action[t] ≈ state[t+3]</code>，除一个 100 ms 纯延迟外二者一致。</strong></p>
+<h4 id="237">2.3.7 对评测效度的影响</h4>
+<p><code>J6_R</code> 撞与 <code>J6_L</code> 完全相同的 +π/3 限位（7.48% 帧），其 train/eval 比值却始终 ≈ 1.0，
+<strong>因为评测集也执行该动作</strong>。差异的来源因此不是数据质量，而是<strong>动作覆盖不匹配</strong>：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>关节</th>
+<th>评测集指令支撑区间</th>
+<th style="text-align: right;">训练帧落在区间内</th>
+<th style="text-align: right;">区间内 <code>abs(gap)</code></th>
+<th style="text-align: right;">区间外 <code>abs(gap)</code></th>
+<th style="text-align: right;">评测集</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>J6_L</code></td>
+<td>[+0.209, +1.047]</td>
+<td style="text-align: right;">81.8%</td>
+<td style="text-align: right;">0.00620</td>
+<td style="text-align: right;"><strong>0.04993</strong></td>
+<td style="text-align: right;">0.00246</td>
+</tr>
+<tr>
+<td><code>J7_L</code></td>
+<td>[−1.571, +0.489]</td>
+<td style="text-align: right;">98.6%</td>
+<td style="text-align: right;"><strong>0.05291</strong></td>
+<td style="text-align: right;">0.00466</td>
+<td style="text-align: right;">0.00722</td>
+</tr>
+<tr>
+<td><code>J6_R</code></td>
+<td>[−0.424, +1.047]</td>
+<td style="text-align: right;">95.0%</td>
+<td style="text-align: right;">0.01032</td>
+<td style="text-align: right;">0.00397</td>
+<td style="text-align: right;">0.01519</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>J7_L</code> 的 98.6% 落在评测集支撑区间之内，说明问题就在共同区间里——
+<strong>评测集覆盖了那个角度范围，但不执行会撞上去的那个动作</strong>；
+<code>J6_L</code> 则确有区间不覆盖（18.2% 训练帧在评测集支撑集之外）。</p>
+<p><strong>结论：现行评测集在一个可测量的具体维度上比训练分布更容易。</strong>
+<code>53_eval_data_eef</code> 与 <code>100_eval_eef</code> 上的全部离线数字，均未覆盖真机会遇到的左腕触限工况。
+这构成一条独立于 §5.3 的效度威胁，且方向一致：<strong>离线尺子量不到最难的那一段</strong>（§10.1 第 2 条）。</p>
 <hr />
 <h2 id="3-act_eef-chunk-horizon-60">3. <code>act_eef</code> 离线结果（一）：chunk 口径，horizon 60</h2>
 <p>数据来源 R7，<code>eval_policy/runs/20260906_acteef_616_baseline/tables.md</code>。</p>
@@ -1475,8 +2018,13 @@ em{color:var(--muted)}
 <p><strong>（b）信息量失衡。</strong> 相对空基线：末端位置 9.52 mm vs 12.65 mm（<strong>1.33×</strong>），
 末端姿态 0.0527 rad vs 0.0553 rad（<strong>1.05×</strong>）。
 <strong>主导平坦 MAE 的那组维度，正是策略相对"照抄当前位姿"几乎没有优势的维度。</strong></p>
-<p>两者合起来给出本报告的核心方法论结论：<strong>平坦 14 维 MAE 在本动作空间中近似是一个
-"左腕姿态指标"，不应作为主排序键。</strong></p>
+<p><strong>（c）该组维度自身含限位分量。</strong> §2.3 的补测显示，<code>l_roll</code> / <code>l_yaw</code> 在训练集上的
+<code>mean|action − state|</code> 为 0.0856 / 0.0959 rad，其中 92%–95% 来自 <code>J7_L @ −π/2</code> 与
+<code>J6_L @ +π/3</code> 两处限位；排除限位后残差仅 0.0056 / 0.0065 rad。
+换言之表中 <code>replan_1</code> 的 <code>l_roll</code> 0.0403 / <code>l_yaw</code> 0.0438 与标签自带的限位偏置<strong>同量级</strong>，
+二者在该指标上不可分离。</p>
+<p>三者合起来给出本报告的核心方法论结论：<strong>平坦 14 维 MAE 在本动作空间中近似是一个
+"左腕姿态指标"，且该指标的一半量的是关节限位而非策略误差，不应作为主排序键。</strong></p>
 <hr />
 <h2 id="5-act_eef">5. <code>act_eef</code> 真机结果与离线—真机对照</h2>
 <p>数据来源 R9。真机数据由使用者提供，本报告及 R9 均未独立复核。</p>
@@ -2855,6 +3403,11 @@ L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了�
 <li><strong>平滑度不是被证实的预测器</strong>。ρ = +0.973 建立在 5 个点、2 个自由度上，
    且其在跨权重段的离线跨度仅 6.7%（0.000210 vs 0.000224），需先证明 6.7% 的离线跨度
    对应得上 20 点的真机跨度。未证明。</li>
+<li><strong>评测集不覆盖左腕触限工况</strong>（§2.3.7，2026-09-09 补测）。<code>J7_L @ −π/2</code> 在四个训练集上
+   影响 3% 的 episode、6.3% 的帧，而 <code>53_eval_data</code> 与 <code>100_eval</code> 两个评测集<strong>一条都没有</strong>
+   （0/53、0/100）。<code>J6_R</code> 撞完全相同的 +π/3 限位却无 train/eval 差异，正因为评测集也做那个动作——
+   故这是<strong>动作覆盖不匹配</strong>，不是数据质量问题。<strong>现行离线尺子在一个可测量的具体维度上比训练分布更容易</strong>，
+   方向与第 2 条一致：离线量不到最难的那一段。</li>
 <li><strong><code>ens_*</code> 与成功率之间仍无任何被验证的离线预测器</strong>。本轮做的是<strong>排除</strong>（四项准确度指标出局），
    剩下一个候选，不是结论。</li>
 <li><strong>N_eff 机制未分离</strong>（§5.2）：三个共变量，两个数据点。</li>
@@ -2879,6 +3432,10 @@ L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了�
 <li><strong>相机身份嵌入</strong>（<code>act-camera-embedding.patch</code> 已就绪，未训练、未评测）。</li>
 <li><strong>失败数据三组的闭环成功率</strong>（<code>env_eval_freq = 0</code>，无任何 rollout 记录）。</li>
 <li><strong><code>act_delta</code> 在 batch7（163 条）上的重训</strong>（job 存在，从未评测）。</li>
+<li><strong>限位工况对训练结果的影响</strong>。§2.3 定位了三个钳位并量化了它们对标签的影响，
+  但"剔掉触限 episode 重训是否改变权重表现"<strong>未做</strong>。§2.3 是数据侧测量，不是训练侧结论。</li>
+<li><strong>限位是否出现在真机推理输出上</strong>。策略是否也会把 <code>J7_L</code> 指令推过 −π/2 未测；
+  真机日志中无该字段。</li>
 <li><strong>部署图像通路的 train/deploy 失配</strong>：训练读视频帧，部署读 JPEG q90 且头部图用 <code>INTER_AREA</code> 缩放。</li>
 <li><strong>夹爪观测越界</strong>（实测 gL 读到 1.209–1.233，训练范围 [0,1]；发送侧有 clip、接收侧无），
   跨两轮 <code>act_delta</code> 审计均未修复。</li>
@@ -2918,6 +3475,18 @@ L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了�
    <code>plan consistency</code>（架构级筛子，同架构选权重时不用）。
    <strong>删除平坦 14 维 MAE 作为主排序键</strong>——两份报告给出两条独立理由（表 19 的 ρ = −0.949；
    表 14 的尺度与信息量双重失衡）。</li>
+<li><strong>补一个含左腕触限工况的第二评测集</strong>（§2.3.7）。两种做法：
+    (i) 补录一批含 <code>J7_L</code> 大范围动作的 episode；或 (ii) 零成本方案——
+    从 <code>616</code> 中按 <code>|mean(action − state)| &gt; 0.2 rad on J7_L</code> 划出那 19 条 episode 作
+    <strong>难例留出集</strong>，与现有评测集并列报告两组数字。现行单一评测集给出的所有离线排序，
+    都建立在一个比训练分布更容易的样本上。</li>
+<li><strong>录制期加限位护栏</strong>：<code>J6_L</code> / <code>J7_L</code> / <code>J6_R</code> 的指令按从臂可达范围钳位，
+    或在 <code>|action − state| &gt; 0.3 rad</code> 持续 &gt; 15 帧时中止该 episode。
+    理由是减少不可学标签，<strong>不是</strong>修复数据错误——现有数据忠实记录了真实发生的事。
+    改动前后须能区分，故第 15 条（记录 git commit）与本条一并做。</li>
+<li><strong>不要剔掉那 19 条 episode 重训。</strong> 它们记录的是真机上真实会发生的工况；
+    剔除会让模型更不认识该工况。若要验证其影响，做<strong>敏感性实验</strong>（剔除后重训一版对比），
+    而非直接改配方。</li>
 <li><strong>今后每个 job 都保存中间步 checkpoint。</strong> <code>save_freq</code> 自 50000 调至 10000 的存储代价，
     远小于"想比较时发现 checkpoint 不存在"（<code>533_eef</code> / <code>361_eef</code> 已因此永久失去训练曲线）。</li>
 <li><strong>不要为 200k vs 100k 追加试验。</strong> 10 点差、3/3 同向已足够决策（用 200k）；
@@ -3056,6 +3625,8 @@ L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了�
 </tbody>
 </table></div>
 <p><code>hold_state</code> 在 h1 上强得反直觉（0.02091，仅比 <code>replan_1</code> 差 24%），因为 30 fps 下相邻帧动作差本就很小。
+§2.3 对该 0.02091 做了分解：约 17% 为 100 ms 执行滞后、约 60% 为三处关节限位饱和，
+排除两者后 <code>action[t] ≈ state[t+3]</code>，残差 0.13°（关节）/ 1.2 mm + 0.3°（末端）。
 由此得出：策略的<strong>姿态</strong>预测仅比"照抄当前位姿"好 1.05×，位置好 1.33×——
 <strong>主导平坦 MAE 的 6 个姿态维，正是策略几乎没有优势的维</strong>。这是 ρ = −0.949 的机制解释之一。</p>
 <h2 id="c">附录 C 复现入口</h2>
@@ -3091,11 +3662,16 @@ L1 损失的最优解是<strong>条件中位数</strong>——表现为"到了�
 <td>层数扫描</td>
 <td>R1 附录复现脚本</td>
 </tr>
+<tr>
+<td><strong>C.4 动作—状态一致性（§2.3）</strong></td>
+<td><code>experiment_report/scripts_action_state_audit/</code>（六个脚本 + README，无 GPU，全量约 6 分钟）</td>
+</tr>
 </tbody>
 </table></div>
 <p><code>act_delta</code> 与失败数据脚本须使用 <code>envs/lerobot</code> 环境（base env 的 pandas 与 numpy 2.x 不兼容）。
 <code>ACTPolicy.predict_action_chunk()</code> 在 lerobot 0.6 中不做归一化也不做反归一化，
 必须自行套用 <code>make_pre_post_processors(cfg, pretrained_path=...)</code>，否则将得到约 0.9 rad 的错误数值（较真值大 60 倍）。</p>
 <hr />
-<p><em>本报告为二次汇编，不含新测量。全部数值可回溯至 §1.4 所列原始报告。</em></p>
+<p><em>本报告主体为二次汇编，全部数值可回溯至 §1.4 所列原始报告；</em><em>§2.3 为 2026-09-09 的一手补测</em><em>，
+复现入口见附录 C.4。</em></p>
 </div></body></html>
