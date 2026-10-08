@@ -1,0 +1,56 @@
+schema_version: 1
+cutoff_date: "2026-10-08"
+inventory_type: candidate_cross_paper_tensions
+scope: "UMI data quality, SLAM, and policy transfer"
+scan_completeness: partial_targeted_scan
+scholar_confirmation: pending
+note: "These are synthesis candidates, not established contradictions or verified novelty claims."
+cross_paper_tensions:
+  - id: T01
+    topic: "规模与保真的贡献"
+    source_a: [U03]
+    source_b: [U04]
+    evidence_pointer: "RDT2 数据与训练框架；HiFi-UMI 后训练与质量实验"
+    interpretation: "数据量、硬件、训练和任务同时变化，不可跨论文归因。"
+    proposed_test: "固定模型和任务，交叉改变样本量与受控噪声。"
+    scholar_confirmation: pending
+  - id: T02
+    topic: "手持监督替代真实控制监督的边界"
+    source_a: [U04]
+    source_b: [U24, U16]
+    evidence_pointer: "HiFi-UMI 实验范围；BRIDGE 与 WT-UMI 原始摘要"
+    interpretation: "任务接触性质和期望/实际状态语义不同，不能直接推广。"
+    proposed_test: "按自由空间与接触阶段分解监督来源和真实策略表现。"
+    scholar_confirmation: pending
+  - id: T03
+    topic: "几何基础模型与经典估计的适用条件"
+    source_a: [S08]
+    source_b: [S17]
+    evidence_pointer: "MASt3R-SLAM 方法及限制；ScaRF-SLAM 比较与尺度对齐协议"
+    interpretation: "标定、输入条件与基准不同，性能主张不是同条件矛盾。"
+    proposed_test: "同一 UMI 数据、相机模型、运行预算和米制评测。"
+    scholar_confirmation: pending
+  - id: T04
+    topic: "持续记忆与显式纠错"
+    source_a: [S13, S14]
+    source_b: [S15]
+    evidence_pointer: "各论文原始摘要与模型设计说明；尚需实验全文精读"
+    interpretation: "流式输出、记忆机制和长期几何误差控制是不同维度。"
+    proposed_test: "在长序列重复访问和尺度改变下测量漂移与纠错。"
+    scholar_confirmation: pending
+  - id: T05
+    topic: "鱼眼策略视场收益与定位模型域差异"
+    source_a: [S08]
+    source_b: [U25]
+    evidence_pointer: "MASt3R-SLAM 镜头畸变限制；相机选择论文摘要"
+    interpretation: "策略观测与几何估计的最优相机输入未必相同。"
+    proposed_test: "保持策略观测，受控改变定位相机模型或重投影。"
+    scholar_confirmation: pending
+  - id: T06
+    topic: "数据可信度与策略信息价值"
+    source_a: [U06, U07]
+    source_b: [U08]
+    evidence_pointer: "FeasibleCap/VISTA 方法；HIL-UMI 摘要"
+    interpretation: "物理有效性和当前策略覆盖互补，不宜压缩为未经校准的单分数。"
+    proposed_test: "相同采集预算下比较硬过滤、可信度加权与价值引导采集。"
+    scholar_confirmation: pending
