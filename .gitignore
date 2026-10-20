@@ -3,6 +3,7 @@
 *.npz
 
 experiment_report/test_scripts/scripts_act_eval_test/test_img/*
+offline-evaluation-review-2026-10-evidence
 
 PA-DAgger
 
